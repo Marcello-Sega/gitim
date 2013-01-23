@@ -2,6 +2,22 @@
                       REFERENCES
 ========================================================
 
+For the GITIM algorithm, and for the Monte Carlo normalization
+procedure:
+
+REF1  M. Sega, S. S. Kantorovich, P. Jedlovszky and M. Jorge,
+      "The generalized identification of truly interfacial 
+      molecules (ITIM) algorithm for nonplanar interfaces", 
+      accepted for publication on J. Chem. Phys., vol. 138.
+
+      Alternatively, http://arxiv.org/abs/1210.2981
+
+For the ITIM algorithm, 
+
+REF2  L. B. Pártay, G. Hantal, P. Jedlovszky, A. Vincze, and 
+      G. Horvai,
+      J. Comput. Chem. 29, 945 (2008).
+
 
                       COMPILING
 ========================================================
@@ -85,7 +101,7 @@ the distribution of surface atoms, and the intrinsic density profiles
 of the atoms in the last two groups.
 
 The option -MCnorm switches on the Monte Carlo normalization (see
-Sec XX in the reference paper SAW), that provide an improved
+Sec IV in REF 1), that provide an improved
 calculation of the intrinsic density profiles.
 
 If the configurations of the surface atoms are needed, for visualization
