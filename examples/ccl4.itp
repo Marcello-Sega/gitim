@@ -1,0 +1,28 @@
+[ atomtypes ]
+;type    mass    charge   ptype          sigma      epsilon
+CCL4     12.01100   0.248       A    3.80000e-01  2.09340e-01
+CLCL4    35.45300  -0.062       A    3.47000e-01  1.11369e+00
+
+[ moleculetype ]
+; name  nrexcl
+CCl4	  3
+
+[ atoms ]
+;   nr   type   resnr  residu  atom    cgnr    charge
+    1  CCL4      1      CCl4    CT1     1        0.248
+    2  CLCL4     1	CCl4	Cl2	1	-0.062
+    3  CLCL4     1	CCl4	Cl3	1	-0.062
+    4  CLCL4     1	CCl4	Cl4	1	-0.062
+    5  CLCL4     1      CCl4    Cl5     1       -0.062 
+    
+[ constraints ]
+;  ai    aj funct        b0       
+    1     2     1     0.17690
+    1     3     1     0.17690
+    1     4     1     0.17690
+    2     3     1     0.2888765
+    2     4     1     0.2888765
+    2     5     1     0.2888765
+    3     4     1     0.2888765
+    3     5     1     0.2888765
+    4     5     1     0.2888765
