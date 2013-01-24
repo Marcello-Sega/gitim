@@ -3,6 +3,15 @@ find the original gromacs source at http://www.gromacs.org). This
 is free software (see the licence in the COPYING file) and comes
 with no warranty.
 
+Additional information can be found in the HOWTO file, on the project 
+website 
+
+    http://www.gitim.eu 
+
+or on the developers page 
+
+    http://code.google.com/p/gitim/
+
 Neither the gromacs developers nor any other person but those listed
 below are responsible for the changes introduced in this derivative
 work, so please do not ask them for support and do not submit bug
