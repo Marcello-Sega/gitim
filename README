@@ -1,0 +1,18 @@
+This is a modified version of the gromacs tool g_density (you can
+find the original gromacs source at http://www.gromacs.org). This
+is free software (see the licence in the COPYING file) and comes
+with no warranty.
+
+Neither the gromacs developers nor any other person but those listed
+below are responsible for the changes introduced in this derivative
+work, so please do not ask them for support and do not submit bug
+reports to the gromacs website, but contact us instead.
+
+
+Rome, 24th of January, 2013
+
+Marcello Sega  <marcello.sega@gmail.com>
+Sofia S. Kantorovich
+Pal Jedlovszky
+Miguel Jorge
+
