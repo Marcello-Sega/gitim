@@ -52,7 +52,7 @@ been tested, and some might result in unpredictable behavior.
 
                    USAGE DESCRIPTION
 ========================================================
-To enable the ITIM analysis, the option -intrinsic should be turned
+To enable the GITIM analysis, the option -intrinsic should be turned
 on. The mass and number intrinsic density profiles can then be
 calculated with the -dens option. At least two and at most three
 groups should be supplied with the option -ng, the first of which
