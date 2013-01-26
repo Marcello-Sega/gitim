@@ -1,0 +1,125 @@
+	
+                      REFERENCES
+========================================================
+
+For the GITIM algorithm, and for the Monte Carlo normalization
+procedure:
+
+REF1  M. Sega, S. S. Kantorovich, P. Jedlovszky and M. Jorge,
+      "The generalized identification of truly interfacial 
+      molecules (ITIM) algorithm for nonplanar interfaces", 
+      accepted for publication on J. Chem. Phys., vol. 138.
+
+      Alternatively, http://arxiv.org/abs/1210.2981
+
+For the ITIM algorithm, 
+
+REF2  L. B. Pártay, G. Hantal, P. Jedlovszky, A. Vincze, and 
+      G. Horvai,
+      J. Comput. Chem. 29, 945 (2008).
+
+
+                       CONTACT
+========================================================
+
+EMAIL: You can contact me at marcello.sega@gmail.com 
+please let me know if you found the software useful, 
+if you found bugs or if you have feature requests.
+
+
+                      COMPILING
+========================================================
+
+
+Edit the $GROMACS field in the makefile so that it points to the
+base directory of a gromacs source distribution (tested with 4.5.5
+so far, but older 4.x versions are most likely fine). Run `make'.
+
+
+                     KNOWN BUGS
+========================================================
+* -dump assumes that -ng 3 is used, and segfaults when less than
+   three groups are supplied.  
+* -dump in conjunction with -com fails in dumping the correct 
+   surface atoms.  
+* -center should be switched on automatically with -intrinsic
+
+                    UNKNOWN BUGS
+========================================================
+Possibly many. Not all combinations of different options have 
+been tested, and some might result in unpredictable behavior.
+
+
+                   USAGE DESCRIPTION
+========================================================
+To enable the ITIM analysis, the option -intrinsic should be turned
+on. The mass and number intrinsic density profiles can then be
+calculated with the -dens option. At least two and at most three
+groups should be supplied with the option -ng, the first of which
+(the "support" group) is used to define the surface, while the
+remaining ones are used to compute the intrinsic density profiles.
+The option -center uses an heuristic algorithm to center the atoms
+of the support group in the simulation box. The option -dump saves
+the surface atoms and those of the other groups in a .gro file
+(multiple frames will be appended to the same file) named surf.gro,
+phase.gro and phase2.gro, respectively.  The option -com is used
+to compute the density profiles using the molecular center of mass
+of molecules or residues, instead of the of the atomic density
+profiles. A file named masscom.dat should be present, listing the
+number of atoms in the molecule/residue for each group, space-separated.
+A zero has to be used when no center of mass calculation should be
+used.
+
+                    USAGE EXAMPLES
+========================================================
+
+In the example/ directory the basic files for running a simulation
+of a CCl4/water mixture are provided. The script RUN.sh runs some
+minimal tests using one configuration instead of a trajectory. The
+.tpr which is generated can anyway be used to produce a full
+trajectory if needed.
+
+To perform the ITIM analysis one needs:
+
+* a configuration or a trajectory
+* the relative .tpr file
+* a file named masscom.dat (for the -com option only) containing
+  the number of atoms in each molecule
+
+A typical command line to analyze the intrinsic density profile in
+a two component liquid looks like:
+
+ g_density  -intrinsic -dens mass -f traj.trr -s topol.tpr -ng 3 -center -sl 200 -o density.xvg  -MCnorm
+
+where three groups are supplied: the first one is used to construct
+the interface, and the other two are the two groups of which the
+intrinsic density profile will be computed.
+
+The output file will contain 4 columns, the location of the bin,
+the distribution of surface atoms, and the intrinsic density profiles
+of the atoms in the last two groups.
+
+The option -MCnorm switches on the Monte Carlo normalization (see
+Sec IV in REF 1), that provide an improved
+calculation of the intrinsic density profiles.
+
+If the configurations of the surface atoms are needed, for visualization
+or for further analysis, they can be saved to disk using the -dump
+option, which creates the files surf.gro, phase.gro and phase2.gro.
+The first file contains the configurations of the surface atoms,
+while the last two contain the configurations of the atoms in the
+last two groups (they differ from those that can be extracted from
+the trajectory as they are shifted)
+
+If one wants to analyze the molecular density profiles, rather than
+the atomic ones, it is possible to use the option  -com. In this
+case, one needs to supply also a file named masscom.dat, that
+contains on one line the number of atoms composing the molecules
+in each group, using a value of 0 when no molecular center of mass
+calculation has to be performed (e.g., for the first group).
+
+
+
+
+
+

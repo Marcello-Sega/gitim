@@ -1,0 +1,18 @@
+The gitim program is derived from the g_density tool of the original
+gromacs source (http://www.gromacs.org). This is free software
+(see the licence in the COPYING file) and comes with no warranty.
+
+Neither the gromacs developers nor any other person but those listed
+below are responsible for the changes introduced in this derivative
+work, so please do not ask them for support and do not submit bug
+reports to the gromacs website, but contact us instead.
+
+Please have a look at the http://www.gitim.eu website for information
+
+Rome, 24th of January, 2013
+
+Marcello Sega  <marcello.sega@gmail.com>
+Sofia S. Kantorovich
+Pal Jedlovszky
+Miguel Jorge
+
