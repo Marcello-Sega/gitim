@@ -3705,7 +3705,7 @@ int main(int argc,char *argv[])
       "Compute order parameter. Switches on -com"},
 #endif 
     { "-com", FALSE, etBOOL, {&bCom}, 
-      "With the -intrinsic option: perform a molecule-based intrinsic analysis (need the number of atoms in the molecule of each group, space-separated, to be in a file named masscom.dat. A zero means that no center of mass is used for that group) }
+      "With the -intrinsic option: perform a molecule-based intrinsic analysis (need the number of atoms in the molecule of each group, space-separated, to be in a file named masscom.dat. A zero means that no center of mass is used for that group)" }
   };
 
   const char *bugs[] = {
