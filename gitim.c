@@ -3793,6 +3793,10 @@ geometry[0]=geometry[1];
 	        bMCnormalization=TRUE;
 		printf("Switching on Monte Carlo normalization for non-planar geometries.");
     } 
+    if(bCenter!=TRUE) { 
+	        bCenter=TRUE;
+		printf("Switching on -center");
+    }
     calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,geometry,bDump,bCenter,bMCnormalization,dens_opt[0][0]);
   } else { 	
     if (dens_opt[0][0] == 'e') {
