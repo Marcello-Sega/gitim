@@ -3787,9 +3787,12 @@ geometry[0]=geometry[1];
            pchar = strtok(NULL, " ");
      }
   }
-  printf("\n%d %d %d\n-----------\n",com_opt[0],com_opt[1],com_opt[2]);
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
+    if(geometry[0][0]!='p' && bMCnormalization!=TRUE) { 
+	        bMCnormalization=TRUE;
+		printf("Switching on Monte Carlo normalization for non-planar geometries.");
+    } 
     calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,geometry,bDump,bCenter,bMCnormalization,dens_opt[0][0]);
   } else { 	
     if (dens_opt[0][0] == 'e') {
