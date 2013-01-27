@@ -1,0 +1,15 @@
+; topology for a pure DPPC bilayer with 128 lipids and 3655 SPC water
+; molecules
+#include "gmx.ff/forcefield.itp"
+#include "lipid.itp"
+#include "dpc.itp"
+#include "spc.itp"
+
+[ system ]
+; name
+DPC micelle
+
+[ molecules ]
+; name	number
+DPC    65
+SOL     6305

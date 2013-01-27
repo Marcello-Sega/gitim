@@ -165,7 +165,7 @@ options 'Qci Tv' to verify all points.\n", notverified);
 */
 #ifndef qh_NOmerge
 void qh_check_maxout(void) {
-  facetT *facet, *bestfacet, *neighbor, **neighborp, *facetlist, *neighborA, **neighborAp;
+  facetT *facet, *bestfacet, *neighbor, **neighborp, *facetlist;
   realT dist, maxoutside, minvertex, old_maxoutside;
   pointT *point;
   int numpart= 0, facet_i, facet_n, notgood= 0;
@@ -181,7 +181,7 @@ void qh_check_maxout(void) {
     trace1((qh ferr, 1023, "qh_check_maxout: determine actual maxoutside and minvertex\n"));
     vertices= qh_pointvertex(/*qh facet_list*/);
     FORALLvertices {
-      FOREACHneighborA_(vertex) {
+      FOREACHneighbor_(vertex) {
         zinc_(Zdistvertex);  /* distance also computed by main loop below */
         qh_distplane(vertex->point, neighbor, &dist);
         minimize_(minvertex, dist);

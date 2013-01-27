@@ -1303,7 +1303,7 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 	if(reset_flag==1) { flag=0; return 0; }
 	if(reset_flag==2) { counter=0; partn=0; return 0; }
 	if(counter == itim->mesh.nelem)  return 0;	
-	itim->alpha_index  = (int *) realloc (itim->alpha_index,(itim->n[0])* sizeof (int)); //SAW TODO: controllare performance qui!
+	itim->alpha_index  = (int *) realloc (itim->alpha_index,(itim->n[0])* sizeof (int)); 
 	itim->alphapoints  = (real *) realloc (itim->alphapoints,(itim->n[0])* sizeof (real)*3);
 	itim->gmx_alpha_id = (int *) realloc (itim->gmx_alpha_id,(itim->n[0])* sizeof (int));
 	partn++;
@@ -1318,7 +1318,6 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 			flag=1; // if already done, don't add this particle anymore.
 		        itim->alpha_index[itim->nalphapoints] = index;
 			if(itim->alphapoints==NULL) exit(printf("Error reallocating alphapoints\n"));
-//printf("SAW added particle %d to the list of %d. %d lines out of %d done\n",index,itim->nalphapoints+1,counter,itim->mesh.nelem);fflush(stdout);
 			if(itim->com_opt[SUPPORT_PHASE]==0) { 
 	                       itim->gmx_alpha_id[itim->nalphapoints] =  gmx_index_phase[SUPPORT_PHASE][index];
 		               itim->alphapoints[3*itim->nalphapoints+0] = itim->phase[SUPPORT_PHASE][3*index+0]; 
@@ -1373,7 +1372,6 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
           /* go to the next entry */
           kd_res_next( presults );
         }
-//	printf("SAW: face: %d testing particle %d, # of lines in range: %d. So far found %d matches\n",face,partn,ccc,counter);
 	kd_res_free( presults );
 	return 1;
 }
@@ -1722,7 +1720,7 @@ setT * compute_alpha_shapes(int dim, int numpoints, coordT* points, real alpha, 
 		convexNumVert = qh_setsize(qh_facetvertices (qh facet_list, NULL, false));
 
 		//Set of alpha complex triangles for alphashape filtering
-		set= qh_settemp(4* (qh num_facets) );  //SAW: this is not deallocated, or?
+		set= qh_settemp(4* (qh num_facets) );  
 
 		qh visit_id++;
 		FORALLfacet_(qh facet_list) {
@@ -1933,7 +1931,6 @@ real interpolate_distance3D_3(struct kdtree * Surface, real *P,real *normal, ITI
 		kd_res_next( pnearest);
         }
 	kd_res_free(pnearest);
-	if(i<3) printf("SAW: not found\n");
      	rvec_sub(p[1],p[0],ba);	
     	rvec_sub(p[2],p[0],ca);	
     	cprod(ba,ca,n);
@@ -2225,7 +2222,7 @@ void arrange_alpha_points(ITIM *itim, int ** gmx_index_phase, t_topology * top,r
 		          case SURFACE_PLANE:
 		                 if (fabs(vertex->point[0]) > itim->box[0]/2. ||  
                                      fabs(vertex->point[1]) > itim->box[1]/2.) continue ;
-                          break;  //SAW CHECK;
+                          break;  
 		          case SURFACE_SPHERE: 
 		          case SURFACE_GENERIC: 
 			  break;
@@ -2240,11 +2237,10 @@ void arrange_alpha_points(ITIM *itim, int ** gmx_index_phase, t_topology * top,r
 	                          itim->alpha_index[nel]  = qh_id(vertex->point);
 			          itim->gmx_alpha_id[nel] = 
                                          gmx_index_phase[SUPPORT_PHASE][ itim->phase_index[SUPPORT_PHASE][itim->alpha_index[nel]]]; 
-      	                          kd_insert(Surface, &itim->alphapoints[3*nel], (real*)vertex); //SAW:ref1
-//printf("Here: %f %f %f",itim->alphapoints[3*nel],itim->alphapoints[3*nel+1],itim->alphapoints[3*nel+2]);
+      	                          kd_insert(Surface, &itim->alphapoints[3*nel], (real*)vertex); 
       	                	  nel++;
 			} else {
-exit(printf("This has to be rewritten: how to map back to the alpha complex?\n")); /// see SAW:ref1 and SAW:ref2
+exit(printf("This has to be rewritten: how to map back to the alpha complex?\n")); 
 				int k,ind,dir, pid = itim->phase_index[SUPPORT_PHASE][qh_id(vertex->point)];
 				real com[3]={0.0, 0.0, 0.0},mass=0,tot_mass=0,tmpcom[3],firstatom[3];
 				/* in case the atoms belong to a molecule we tagged already, skip this point */
@@ -2277,7 +2273,7 @@ exit(printf("This has to be rewritten: how to map back to the alpha complex?\n")
 				        com[dir]/=tot_mass;
 					while(com[dir] >  itim->box[dir]/2.) com[dir] -= itim->box[dir];
 					while(com[dir] < -itim->box[dir]/2.) com[dir] += itim->box[dir];
-				        itim->alphapoints[3*nel+dir]=com[dir]; //SAW:ref2
+				        itim->alphapoints[3*nel+dir]=com[dir]; 
 				}
       	                        kd_insert(Surface, &itim->alphapoints[3*nel], &itim->alphapoints[3*nel+2]); 
 				nel++;
@@ -2404,8 +2400,6 @@ void dump_surface_molecules(t_topology* top,FILE* cid){
 
 		for(i=0;i<itim->n[INNER_PHASE];i++){
 			currentresindex=top->atoms.atom[itim->phase_index[INNER_PHASE][i]].resind;
-                       // printf("residue: %d %d %s\n",itim->phase_index[INNER_PHASE][i],currentresindex,
-	//				*(top->atoms.atomname[itim->phase_index[INNER_PHASE][i]]));
 			if(currentresindex!=lastresindex) {
 					resNR++;
 					lastresindex=currentresindex;
@@ -2416,7 +2410,7 @@ void dump_surface_molecules(t_topology* top,FILE* cid){
         }
         if(atomsinRes==0){ exit(printf("Error: number of atoms in INNER_PHASE residues is 0\n"));}
         fprintf(cid,"%s\n",*(top->name));
-        fprintf(cid,"%d\n",itim->nalphapoints*atomsinRes); /* SAW This is a pure mess. If two surface atoms are in the same residue, 
+        fprintf(cid,"%d\n",itim->nalphapoints*atomsinRes); /* If two surface atoms are in the same residue, 
 							      they will be printed twice. FIXME */
  	for(i=0;i<itim->nalphapoints;i++){
                int offset = (itim->gmx_alpha_id[i]%atomsinRes);
@@ -2586,7 +2580,7 @@ void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_
 	  } // end switch periodicity
 #ifdef ALPHA
 	  if (itim->method==METHOD_A_SHAPE && phase==SUPPORT_PHASE){ 
-          	itim->pradii = qh_set_radii(itim->radii,itim->phase[phase],3,itim->n[phase]);  // SAW !! 
+          	itim->pradii = qh_set_radii(itim->radii,itim->phase[phase],3,itim->n[phase]);  
 		qh_set_maxval(itim->box);
 	  }
 #endif
@@ -2626,8 +2620,8 @@ void compute_normal(rvec p1,rvec p2,rvec p3,real * normal,GEOMETRY geometry){
             rvec_sub(p3,p1,v2);                                  
             cprod(v1,v2,vn);
             unitv(vn,vn);
-            /* SAW: here we are assuming that we are using the -center option,
-                    which should anyway always on for the planar case and spherical cases... Fix this. */
+            /* here we are assuming that we are using the -center option,
+               which should anyway always on for the planar case and spherical cases... FIXME. */
             if (geometry==SURFACE_PLANE)
                  if( vn[2]*p1[2]<0 ) vn[2]*=-1;
             normal[0]=vn[0]; normal[1]=vn[1]; normal[2]=vn[2];
@@ -3082,8 +3076,7 @@ exit(printf("Re-implement the calculation of the normal vector in interpolate_di
 				order[3]=iprod(v2,vn); order[3]=(3*order[3]*order[3] -1. )/2.; order2[3]=order[3]*order[3];
                  }
 
-                 switch(itim->geometry){ // SAW: TODO: again, this implies -center ... deal with that.
-		      //case SURFACE_SPHERE: locnumber=1/(4*M_PI*iprod(p4,p4)); locmass*=locnumber; break;
+                 switch(itim->geometry){ // FIXME: again, this implies -center ... deal with that.
 		      case SURFACE_SPHERE: locnumber=1; break;
 		      case SURFACE_GENERIC: locnumber=1; break;
 		      case SURFACE_PLANE: locnumber=1; break;
@@ -3096,7 +3089,7 @@ exit(printf("Re-implement the calculation of the normal vector in interpolate_di
 		 populate_histogram(j, dist, histo, itim,locmass/(4.*M_PI*iprod(p4,p4)));
 #endif
                
-                 if(normal[0]!=NORMAL_UNDEFINED) /*SAW: TODO NOTE that this creates an inconsistency between the counting of masss profile and the others. Should one just drop points which do not have a triangle associated on the surface, or should we use the macroscopic vector in those cases? See perform_interpolation() for the handling of pathological cases.*/
+                 if(normal[0]!=NORMAL_UNDEFINED) /*NOTE that this creates an inconsistency between the counting of masss profile and the others. Should one just drop points which do not have a triangle associated on the surface, or should we use the macroscopic vector in those cases? See perform_interpolation() for the handling of pathological cases.*/
                     if( j < itim->ngmxphases ) { 
 		              populate_histogram(OFF_NUMBER+j, dist, histo, itim,locnumber);
                               if(itim->bOrder && normal[0]!=NORMAL_UNDEFINED ) { 
@@ -3567,7 +3560,7 @@ real * load_radii( t_topology *top ) {
             	sig6 = c12/c6;
             	vdw  = pow(sig6,1.0/6.0);
         	}
-            radii[i] = 0.5 * vdw;  /* SAW !!! */
+            radii[i] = 0.5 * vdw;  
        }
        return radii;
 }
@@ -3613,7 +3606,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
         itim = init_intrinsic_surface(axis, alpha, 0.05,  box, nr_grps, nslices,radii,index,gnx,com_opt,bOrder,bMCnormalization,geometry); 
                /* TODO: decide if the density of test lines (0.05) should be hardcoded or not.*/
 	do { 
-// (SAW) BUG : when no pbc are defined, it loops forever... 
+// FIXME : when no pbc are defined, it loops forever... 
     		gmx_rmpbc(gpbc,natoms,box,x0);
                 if(bCenter){
 		    put_atoms_in_box(box,natoms,x0);
@@ -3646,7 +3639,6 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 
 		
   	} while (read_next_x(oenv,status,&t,natoms,x0,box));
-
 	if(dens_opt!='s')   
 	   finalize_intrinsic_profile(slDensity, nslices, slWidth);
 
@@ -3681,45 +3673,45 @@ int main(int argc,char *argv[])
   static gmx_bool bSymmetrize=FALSE;
   int com_opt[64];
   int bCom=0; 
-  int bMCnormalization=0; 
+  int bMCnormalization=TRUE; 
   char com_opt_file[1024];
-  static gmx_bool bCenter=FALSE;
+  static gmx_bool bCenter=TRUE;
   static gmx_bool bIntrinsic=FALSE;
   static gmx_bool bDump=FALSE;
   static gmx_bool bOrder=FALSE;
   t_pargs pa[] = {
     { "-d", FALSE, etSTR, {&axtitle}, 
-      "Take the normal on the membrane in direction X, Y or Z." },
+      "Take the normal of the surface in direction X, Y or Z. Disregarded when -geometry is used with option different from (p)lane." },
     { "-dump", FALSE, etBOOL, {&bDump}, 
-      "Dump phase(s) and interfacial atoms." },
+      "Dump phase(s) and interfacial atoms. Generates the files surf.dat, phase.dat and phase2.dat" },
     { "-sl",  FALSE, etINT, {&nslices},
       "Divide the box in #nr slices." },
     { "-dens",    FALSE, etENUM, {dens_opt},
       "Density"},
     { "-ng",       FALSE, etINT, {&ngrps},
       "Number of groups to compute densities of" },
-    { "-symm",    FALSE, etBOOL, {&bSymmetrize},
-      "Symmetrize the density along the axis, with respect to the center. Useful for bilayers." },
-    { "-center",  FALSE, etBOOL, {&bCenter},
+    { "-center",  TRUE, etBOOL, {&bCenter},
       "Shift the center of mass along the axis to zero. This means if your axis is Z and your box is bX, bY, bZ, the center of mass will be at bX/2, bY/2, 0."},
     { "-intrinsic", FALSE, etBOOL, {&bIntrinsic}, 
-      "Perform intrinsic analysis (needs a reference group)" },
+      "Perform intrinsic analysis (needs at least one reference group and on group for the density calculation)" },
     { "-alpha", FALSE, etREAL, {&alpha}, 
       "Probe sphere radius for the intrinsic analysis" },
-    { "-MCnorm", FALSE, etBOOL, {&bMCnormalization}, 
-      "automatic normalization using MC calculation for arbitrary coordinate systems" },
+    { "-MCnorm", TRUE, etBOOL, {&bMCnormalization}, 
+      "automatic normalization using Monte Carlo calculation for arbitrary coordinate systems" },
 #ifdef ALPHA
     { "-geometry", FALSE, etENUM, {geometry}, 
-      "Geometry of the phase: plane or sphere. Option -d is disregarded for (s)." },
+      "Geometry of the phase:" },
     { "-order", FALSE, etBOOL, {&bOrder}, 
       "Compute order parameter. Switches on -com"},
 #endif 
     { "-com", FALSE, etBOOL, {&bCom}, 
-      "[only with -alpha option: perform a molecule-based intrinsic analysis. Pass in a string the number of atoms in the molecule of each phase, space-separated. A zero means that no center of mass is used. ]" }
+      "With the -intrinsic option: perform a molecule-based intrinsic analysis (need the number of atoms in the molecule of each group, space-separated, to be in a file named masscom.dat. A zero means that no center of mass is used for that group) }
   };
 
   const char *bugs[] = {
     "When calculating electron densities, atomnames are used instead of types. This is bad.",
+    "-dump can be used only when three groups are supplied.",
+    "-dump doesn't work together with -com",
   };
   
   real **density;        /* density per slice          */
@@ -3745,28 +3737,6 @@ int main(int argc,char *argv[])
 geometry[0]=geometry[1];
 #endif
 #define NFILE asize(fnm)
-if(0){
-real rad,p[3],q[3],r[3],s[3],wp,wq,wr,ws;
-printf("\n-=-=-=-=-=-=-=-=-=-\n");
-p[0]=-2.87242; p[1]= -1.21304  ; p[2]=1.66853;
-q[0]=-2.85356; q[1]= -0.788321 ; q[2]=1.46017;
-r[0]=-2.8576 ; r[1]=-0.571381  ; r[2]=2.01708;
-s[0]=-2.88333; s[1]= -1.255    ; s[2]=1.84003;
-
-/*
-p[0]= 1.;p[1]= 1.; p[2]= 1.;
-q[0]=-1.;q[1]=-1.; q[2]= 1.;
-r[0]=-1.;r[1]= 1.; r[2]=-1.;
-s[0]= 1.;s[1]=-1.; s[2]=-1.;
-*/
-//for(wp=0.;wp<sqrt(2);wp+=0.1){
-for(wp=0.;wp<0.19;wp+=0.01){
-wq=wr=ws=0.;
-rad= compute_osculating_sphere_radius(p,q,r,s, wp, wq, wr, ws);
-printf("%f %f\n",wp,rad);
-}
-exit(0);
-}
 
   CopyRight(stderr,argv[0]);
   parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME | PCA_BE_NICE,

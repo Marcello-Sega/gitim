@@ -43,6 +43,7 @@ so far, but older 4.x versions are most likely fine). Run `make'.
 * -dump in conjunction with -com fails in dumping the correct 
    surface atoms.  
 * -center should be switched on automatically with -intrinsic
+*  when no pbc are defined, the code loops forever.
 
                     UNKNOWN BUGS
 ========================================================

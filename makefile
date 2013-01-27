@@ -7,6 +7,7 @@ NO_OMP=-DUSE_OMP
 TP=-DTIME_PROFILE
 ALPHA_INCLUDE=-I./qhull/
 ALPHA_LIB=-L./qhull -lqhull
+ALPHA_LIB=-L$(HOME)/Dropbox/Documents/ITIM/qhull_src -lqhull
 GMXLIBS=-L$(GROMACS)/src/mdlib/.libs/ -L$(GROMACS)/src/gmxlib/.libs/
 #
 OPT=-O3 -Wall -pedantic -std=c99  -Werror -Wno-unused -Wuninitialized  -ffast-math -fopenmp

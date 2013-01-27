@@ -2,11 +2,11 @@
 
 GROMPP=`which grompp`
 
-GDENS1=`which gitim | wc -l `
-GDENS2=`which ../../gitim | wc -l `
+GDENS1=`which gitim`
+GDENS2=`which ../../gitim`
 
-if [  $GDENS1 -eq 0 ] ; then
-	if [  $GDENS2 -eq 0  ] ; then 
+if [ -z  $GDENS1 ] ; then
+	if [ -z $GDENS2  ] ; then 
 		echo "No working version of gitim  was found neither in the path, not in the parent folder, cannot continue."
                 exit
         else

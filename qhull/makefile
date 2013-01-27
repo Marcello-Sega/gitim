@@ -67,8 +67,6 @@ CCOPTS2 = $(CCOPTS1)
 # OBJS ordered by frequency of execution with small files at end.  Better locality.
 OBJS = rboxlib.o user.o global.o stat.o io.o geom2.o poly2.o merge.o \
        libqhull.o geom.o poly.o qset.o mem.o usermem.o userprintf.o random.o
-#SAW tentative  ###OBJS =   user.o global.o stat.o io.o geom2.o poly2.o merge.o \
-       libqhull.o geom.o poly.o qset.o mem.o usermem.o userprintf.o  random.o
 
 # CFILES ordered alphabetically after libqhull.c 
 #CFILES= unix.c libqhull.c geom.c geom2.c global.c io.c mem.c merge.c poly.c \

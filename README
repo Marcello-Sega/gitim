@@ -1,11 +1,30 @@
 The gitim program is derived from the g_density tool of the original
-gromacs source (http://www.gromacs.org). This is free software
-(see the licence in the COPYING file) and comes with no warranty.
+gromacs source (http://www.gromacs.org). This is free software (see
+the licence in the COPYING file) and comes with no warranty.  The
+code makes use, in addition, of (a) a slightly modified version of
+the kdtree (http://code.google.com/p/kdtree/) routines, which are
+included directly in the sources of this project, along with the
+copyright notice (also in the COPYING-KDTREE.txt file) and (b) a
+slightly modified version of the qhull software (http://www.qhull.org/
+version 2010.1) in form of a library, for the calculation of alpha
+shapes (copyright notice in COYING-QHULL.txt). The modifications
+on the qhull code were done by M.S. (below) to provide interoperability
+between the gromacs-derived code and qhull.
 
-Neither the gromacs developers nor any other person but those listed
-below are responsible for the changes introduced in this derivative
-work, so please do not ask them for support and do not submit bug
-reports to the gromacs website, but contact us instead.
+Additional information can be found in the HOWTO file, on the project 
+website 
+
+    http://www.gitim.eu 
+
+or on the developers page 
+
+    http://code.google.com/p/gitim
+
+Neither the gromacs, kdtree and qhull developers nor any other
+person but those listed below are responsible for the changes
+introduced in this derivative work, so please do not ask them for
+support and do not submit bug reports to the gromacs, kdtree or
+qhull website, but contact us instead.
 
 Please have a look at the http://www.gitim.eu website for information
 

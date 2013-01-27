@@ -1308,13 +1308,13 @@ realT qh_radius(pointT *point){
 	if(point<=(qh first_point)+((qh hull_dim) * qh num_points)  && point >=qh first_point) { 
 		return   *(qh_radii+(point-qh first_point)/((qh hull_dim)) ) ;
 	} else {  exit(printf("Qhull error in qh_radius() [geom2.c]    point = %p not inbetween %p and %p\n",
-				point,qh first_point,qh first_point+(qh hull_dim)*(qh num_points)));}  /*SAW TODO: put me back and debug me! */
+				point,qh first_point,qh first_point+(qh hull_dim)*(qh num_points)));}  
 }
 int qh_id(pointT *point){
 	if(point<=(qh first_point)+((qh hull_dim) * qh num_points)  && point >=qh first_point) { 
 		return   ( (point - (qh first_point))/((qh hull_dim)) )  ;
 	} else {  exit(printf("Qhull error in qh_id() [geom2.c]    point = %p not inbetween %p and %p\n",
-				point,qh first_point,qh first_point+(qh hull_dim)*(qh num_points)));}  /*SAW TODO: put me back and debug me! */
+				point,qh first_point,qh first_point+(qh hull_dim)*(qh num_points)));}  
 }
 /*-<a                             href="qh-geom.htm#TOC"
   >-------------------------------</a><a name="pointdist">-</a>
