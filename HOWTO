@@ -109,8 +109,9 @@ the distribution of surface atoms, and the intrinsic density profiles
 of the atoms in the last two groups.
 
 The option -MCnorm switches on the Monte Carlo normalization (see
-Sec IV in REF 1), that provide an improved
-calculation of the intrinsic density profiles.
+Sec IV in REF 1), that provides an improved calculation of the
+intrinsic density profiles, removing the smearing caused by the
+periodic copy of the fluctuating interface
 
 If the configurations of the surface atoms are needed, for visualization
 or for further analysis, they can be saved to disk using the -dump
