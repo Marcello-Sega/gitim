@@ -1,6 +1,6 @@
 CC=gcc
 GROMACS=$(HOME)/gromacs-src/
-DEBUG=-ggdb
+NO_DEBUG=-ggdb
 NO_VALGRIND=-g -fno-inline
 NO_PROFILE=-pg -fno-omit-frame-pointer
 NO_OMP=-DUSE_OMP
