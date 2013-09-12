@@ -1595,7 +1595,7 @@ void dump_surface_molecules(t_topology* top,FILE* cid,atom_id ** gmx_index_phase
         }
 
         fprintf(cid,"%s\n",*(top->name));
-        fprintf(cid,"%d\n",checkedresidues*atomsinRes); 
+       fprintf(cid,"%d\n",checkedresidues*atomsinRes); 
         checkedresidues=0;
 							   
  	for(i=0;i<itim->nalphapoints;i++){
