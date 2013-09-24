@@ -1241,17 +1241,22 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 	partn++;
         /* find the lines within range from our particle position pos */
 	presults = kd_nearest_range( itim->mesh.tree, pos, sigma + itim->alpha); 
+         if(0) printf("gromacs id: %d \n",index+1);
         while( !kd_res_end( presults ) ) {
           /* get the data and position of the current result item */
           p =  (int*)kd_res_item(presults, res); /* they were init'd all to DIR_POSITIVE. Once we find a 
 	  					    touching gridline, we flip the value (see below). */
+         if(0) printf("gromacs id: %d  pos = %f %f %f dist = %f\n",index+1,res[0],res[1],res[2],sqrt((res[0]-pos[0])*(res[0]-pos[0])+
+                                                                                           (res[1]-pos[1])*(res[1]-pos[1])+
+                                                                                           (res[2]-pos[2])*(res[2]-pos[2]))
+);
 	  ccc++;
 	  if (*p==face) {
 		if(flag==0) { 
 			flag=1; // if already done, don't add this particle anymore.
 		        itim->alpha_index[itim->nalphapoints] = index;
 			if(itim->alphapoints==NULL) exit(printf("Error reallocating alphapoints\n"));
-//printf("SAW added particle %d to the list of %d. %d lines out of %d done\n",index,itim->nalphapoints+1,counter,itim->mesh.nelem);fflush(stdout);
+//printf("SAW added particle %d  (gromacs id %d) to the list of %d. %d lines out of %d done\n",index,index+1,itim->nalphapoints+1,counter,itim->mesh.nelem);fflush(stdout);
 			if(itim->com_opt[SUPPORT_PHASE]==0) { 
 	                       itim->gmx_alpha_id[itim->nalphapoints] =  gmx_index_phase[SUPPORT_PHASE][index];
 		               itim->alphapoints[3*itim->nalphapoints+0] = itim->phase[SUPPORT_PHASE][3*index+0]; 
@@ -1374,8 +1379,8 @@ int check_itim_testlines_periodic(Direction face, int index, real * pos,real sig
 	real periodic[2];
 	real border_positive[2];
 	real border_negative[2];
-	border_positive[0]=itim->box[0]/2. - sigma - itim->alpha ;
-	border_positive[1]=itim->box[1]/2. - sigma - itim->alpha ;
+	border_positive[0]=itim->box[0]/2.  - sigma - itim->alpha ;
+	border_positive[1]=itim->box[1]/2.  - sigma - itim->alpha ;
 	border_negative[0]=-itim->box[0]/2. + sigma + itim->alpha ;
 	border_negative[1]=-itim->box[1]/2. + sigma + itim->alpha ;
 
@@ -2693,8 +2698,8 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
           gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
   	gpbc = gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
 
-        itim = init_intrinsic_surface(axis, alpha, 0.05,  box, nr_grps, nslices,radii,index,gnx,com_opt,bOrder,dump_mol,bMCnormalization,geometry); 
-               /* TODO: decide if the density of test lines (0.05) should be hardcoded or not.*/
+        itim = init_intrinsic_surface(axis, alpha, 0.03,  box, nr_grps, nslices,radii,index,gnx,com_opt,bOrder,dump_mol,bMCnormalization,geometry); 
+               /* TODO: decide if the density of test lines (0.03) should be hardcoded or not.*/
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
     		gmx_rmpbc(gpbc,natoms,box,x0);

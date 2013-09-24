@@ -1,5 +1,5 @@
 CC=gcc
-GROMACS=$(HOME)/gromacs-4.5.5/
+GROMACS=$(HOME)/gromacs-4.5.7/
 NO_DEBUG=-ggdb
 NO_VALGRIND=-g -fno-inline
 NO_PROFILE=-pg -fno-omit-frame-pointer
