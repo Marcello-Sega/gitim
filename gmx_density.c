@@ -1433,7 +1433,7 @@ int projection_negative(const void * a, const void * b) {
 }
 
 // TODO !! NOTE: this allows only computation of surface molecules of the SUPPORT_PHASE
-void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0){
+void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0,int * mask){
 	int i=0,index,result;
 #ifdef TIME_PROFILE
         struct timeval tp;
@@ -1449,6 +1449,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
         i=0;
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
+                if(!mask[i]){ i++; continue;}
 		result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
           	i++ ; 
 		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE])); }
@@ -1676,7 +1677,97 @@ void init_itim(int nphases) {
 	itim->dump_phase_points=dump_phase_points;
 }
 
-void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_index_phase){
+void generate_mask(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, int ** gmx_index_phase, matrix box){
+#define CLUSTERCUT 1.5
+        int atom,cluster,cluster2,element,element2,largest_cluster;
+        int phase=SUPPORT_PHASE;
+        static int **matrix=NULL;
+        static int *clustersize=NULL;
+        static int *rowsize=NULL;
+	if(*mask==NULL){
+	  *mask=(int*)malloc(nindex[phase]*sizeof(int));
+        }
+	if(!bCluster){
+	      // by default, use all atoms;
+             for(atom=0 ; atom <  nindex[phase] ; atom++) (*mask)[atom]=1;
+             return ;
+        } else {
+             for(atom=0 ; atom <  nindex[phase] ; atom++) (*mask)[atom]=0;
+        }
+
+        if(clustersize==NULL)clustersize= (int*)malloc(nindex[phase]*sizeof(int)) ;
+        if(rowsize==NULL)    rowsize=     (int*)malloc(nindex[phase]*sizeof(int)) ;
+        for(cluster=0;cluster<nindex[phase];cluster++){
+                clustersize[cluster]=1;
+                rowsize[cluster]=1;
+        } 
+        if(matrix==NULL)    {
+			 matrix =     (int**)malloc(nindex[phase]*sizeof(int*)) ;
+		         matrix[cluster]=(int*)malloc(rowsize[cluster]*sizeof(int));
+        }
+        for(cluster=0;cluster<nindex[phase];cluster++){
+                // let's start with size 1, we then will grow exponentially if needed.
+		matrix[cluster]=(int*)realloc(matrix[cluster],rowsize[cluster]*sizeof(int));
+        }
+        // at the beginning we have one atom in each cluster;
+        for(cluster=0;cluster<nindex[phase];cluster++){
+       		matrix[cluster][0]=cluster;
+        } 
+        for(cluster=0;cluster<nindex[phase];cluster++){
+//printf("cluster %d/%d\n",cluster,nindex[phase]);
+	    for(element=0;element<clustersize[cluster];element++){
+//printf("	element %d/%d\n",element,clustersize[cluster]);
+                int atom1;
+                atom1=matrix[cluster][element];
+		for(cluster2=cluster+1;cluster2<nindex[phase];cluster2++){
+//printf("		cluster2 %d/%d\n",cluster2,nindex[phase]);
+	           for(element2=0;element2<clustersize[cluster2];element2++){
+//printf("			element2 %d/%d\n",element2,clustersize[cluster2]);
+                        double distance,d[3];
+                        int atom2,m;
+                        atom2=matrix[cluster2][element2];
+  			for(m=0;m<3;m++){
+			  d[m]=(gmx_coords)[gmx_index_phase[phase][atom1]][m] - (gmx_coords)[gmx_index_phase[phase][atom2]][m] ;
+                        }
+  			for(m=0;m<3;m++){
+                   	  while(d[m]> box[m][m]/2.) d[m]-=box[m][m];
+                  	  while(d[m]<-box[m][m]/2.) d[m]+=box[m][m];
+                 	}
+                        distance=sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+			if(distance<CLUSTERCUT){
+                                int i;
+                                //check memory
+                                while(rowsize[cluster]<clustersize[cluster]+clustersize[cluster2]){
+					rowsize[cluster]*=2;
+                                }
+                                matrix[cluster]=(int*)realloc(matrix[cluster],rowsize[cluster]*sizeof(int));
+				for(i=0;i<clustersize[cluster2];i++){
+                                     // let's add on top of the stack the complete matrix row 'cluster2'
+				     matrix[cluster][clustersize[cluster]+i]=matrix[cluster2][i];	
+                                }
+				clustersize[cluster]+=clustersize[cluster2];
+				clustersize[cluster2]=0;
+                                break;
+                        }
+                   }
+                }
+            }
+        }
+          
+        
+        largest_cluster=0;
+        for(cluster=1 ; cluster <  nindex[phase] ; cluster++) { 
+		if(clustersize[cluster]>clustersize[largest_cluster]){
+			largest_cluster=cluster;
+		}	
+        }
+	// all atoms belonging to the largest cluster are unmasked
+ 	for(element=0 ; element < clustersize[largest_cluster] ; element++) { 
+		(*mask)[matrix[largest_cluster][element]]=1;
+	}
+}
+
+void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_index_phase,int * mask){
 /* NOTE:  Here we assume that particles are within a [-box/2:box/2]^3. */
 	int atom,additional=0,sign,sign2;
 	const real scale = 3.5; /* This defines the thickness of the periodic border, in units of alpha*/
@@ -1976,10 +2067,11 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
 
 printf("box=%f, histo->size= %f = %f, bWidth=%f, nitem=%d =%d, bw*nit=%f\n",itim->box[2],histo->size,histo->minsize,histo->bWidth,histo->nbins,*nslices,histo->nbins*histo->bWidth);
 }
-void  compute_intrinsic_surface(matrix box, int ngrps, rvec * gmx_coords, int *nindex, atom_id ** gmx_index_phase,t_topology * top){
+void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_coords, int *nindex, atom_id ** gmx_index_phase,t_topology * top){
 	
 	ITIM * itim = global_itim;
 	int ind=itim->normal;
+        static int * mask=NULL;
 #ifdef TIME_PROFILE
         struct timeval tp;
         struct timeval tp2;
@@ -1992,13 +2084,15 @@ void  compute_intrinsic_surface(matrix box, int ngrps, rvec * gmx_coords, int *n
         gettimeofday(&tp, NULL);
 #endif
 	switch (itim->method) { 
+		
 		case METHOD_ITIM: 
 	              /* creates a grid which is as close as possible to the target mesh size, 
 	                 but still has an integer number of cells in the sim box*/
 	              init_itim_grid(itim);
 		      /* rearrange positions and indices to be fed to itim routines */
-	              arrange_datapoints(itim, gmx_coords, nindex,  (int**)gmx_index_phase);
-		      compute_itim_points(DIR_POSITIVE,itim,(int**)gmx_index_phase,top,gmx_coords);
+                      generate_mask(bCluster,gmx_coords,&mask,nindex, (int**)gmx_index_phase,box);
+	              arrange_datapoints(itim, gmx_coords, nindex,  (int**)gmx_index_phase,mask);
+		      compute_itim_points(DIR_POSITIVE,itim,(int**)gmx_index_phase,top,gmx_coords,mask);
 		      kd_free(itim->mesh.tree); itim->mesh.tree=NULL;
 		break;
 		default: exit(printf("Method not implemented yet\n"));
@@ -2674,7 +2768,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		  real ***slDensity, int *nslices, t_topology *top, int ePBC,
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
                   real alpha,int *com_opt, int bOrder, const char ** geometry, 
-                  int bDump,int bCenter,int dump_mol,int bMCnormalization,char dens_opt){
+                  int bDump,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt){
 	enum {NO_ADDITIONAL_INFO=0,ADDITIONAL_INFO=1};
 	ITIM * itim;
 	real * radii;
@@ -2712,7 +2806,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
                    not the gromacs std one:), and shift/rebox the rest accordingly */
       		center_coords(&top->atoms,box,x0,axis,index[0],gnx[0]);
                 /* Identify the atom,tops belonging to the intrinsic surface */
-	        compute_intrinsic_surface(box, nr_grps, x0, gnx, index,top);
+	        compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top);
 		if(bDump){
 	            itim->dump_phase_points(INNER_PHASE,top,phase_cid); 
 	            itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); 
@@ -2766,6 +2860,7 @@ int gmx_density(int argc,char *argv[])
   char com_opt_file[1024];
   static gmx_bool bCenter=FALSE;
   static gmx_bool bIntrinsic=FALSE;
+  static gmx_bool bCluster=FALSE;
   static gmx_bool bDump=FALSE;
   static gmx_bool bOrder=FALSE;
   t_pargs pa[] = {
@@ -2787,12 +2882,14 @@ int gmx_density(int argc,char *argv[])
       "Shift the center of mass along the axis to zero. This means if your axis is Z and your box is bX, bY, bZ, the center of mass will be at bX/2, bY/2, 0."},
     { "-intrinsic", FALSE, etBOOL, {&bIntrinsic}, 
       "Perform intrinsic analysis (needs a reference group)" },
+    { "-cluster", FALSE, etBOOL, {&bCluster}, 
+      "Filter initial molecules through cluster analysis" },
     { "-alpha", FALSE, etREAL, {&alpha}, 
       "Probe sphere radius for the intrinsic analysis" },
     { "-MCnorm", FALSE, etBOOL, {&bMCnormalization}, 
       "automatic normalization using MC calculation for arbitrary coordinate systems" },
     { "-com", FALSE, etBOOL, {&bCom}, 
-      "with the -intrinsic option, perform a molecule-based intrinsic analysis. A file named masscom.dat should be present, with the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." }
+      "with the -intrinsic option, perform a molecule-based intrinsic analysis. One should give to this flag the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." }
   };
 
   const char *bugs[] = {
@@ -2894,7 +2991,7 @@ exit(0);
   }
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
-    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,geometry,bDump,bCenter,dump_mol,bMCnormalization,dens_opt[0][0]);
+    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,geometry,bDump,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0]);
   } else { 	
     if (dens_opt[0][0] == 'e') {
       nr_electrons =  get_electrons(&el_tab,ftp2fn(efDAT,NFILE,fnm));
