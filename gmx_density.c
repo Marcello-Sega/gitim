@@ -983,6 +983,7 @@ typedef struct {
 	int nalphapoints;
 	int * alpha_index;
 	real * radii;
+        int * mask;
 	int * gmx_alpha_id;
 	int * gmx_alpha_phase_id;
 	int ** gmx_index;
@@ -1419,6 +1420,8 @@ int projection_positive(const void * a, const void * b) {
 	j = *(int*)b;	
 	a2 = itim->phase[SUPPORT_PHASE][3*i+2] + itim->radii[i] ;
 	b2 = itim->phase[SUPPORT_PHASE][3*j+2] + itim->radii[j] ;
+        if(itim->mask[i]==0) a2-=10000.;
+        if(itim->mask[j]==0) b2-=10000.;
 	return (a2>b2?-1:1);
 }
 int projection_negative(const void * a, const void * b) {
@@ -1429,6 +1432,8 @@ int projection_negative(const void * a, const void * b) {
 	j = *(int*)b;	
 	a2 = itim->phase[SUPPORT_PHASE][3*i+2] - itim->radii[i] ;
 	b2 = itim->phase[SUPPORT_PHASE][3*j+2] - itim->radii[j] ;
+        if(itim->mask[i]==0) a2+=10000.;
+        if(itim->mask[j]==0) b2+=10000.;
 	return (a2<b2?-1:1);
 }
 
@@ -1449,7 +1454,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
         i=0;
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
-                if(!mask[i]){ i++; continue;}
+//printf("positive: %d %d [%d]\n",i,index,mask[index]);fflush(stdout);
 		result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
           	i++ ; 
 		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE])); }
@@ -1461,6 +1466,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
 	qsort((void*)itim->phase_index[SUPPORT_PHASE], itim->n[SUPPORT_PHASE], sizeof(int) , projection_negative);
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
+//printf("negative: %d %d [%d]\n",i,index,mask[index]);fflush(stdout);
 		result = check_itim_testlines_periodic(DIR_NEGATIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
           	i++; 
 		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the negative side...\n",itim->n[SUPPORT_PHASE])); }
@@ -1607,7 +1613,7 @@ void dump_surface_molecules(t_topology* top,FILE* cid,atom_id ** gmx_index_phase
  	for(i=0;i<itim->nalphapoints;i++){
                surface_index = itim->alpha_index[i];
                int offset = surface_index%atomsinRes;//(itim->gmx_alpha_id[i]%atomsinRes);
-               if(offset!=0) printf("Here:%d %d %d\n",i,offset,surface_index);
+ //              if(offset!=0) printf("Here:%d %d %d\n",i,offset,surface_index);
                surface_index -= offset;  /*  here we rewind to the beggining of the residue ... */
                atom_index = gmx_index_phase[SUPPORT_PHASE][surface_index];
                for(j=0;j<checkedresidues;j++){
@@ -1678,7 +1684,7 @@ void init_itim(int nphases) {
 }
 
 void generate_mask(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, int ** gmx_index_phase, matrix box){
-#define CLUSTERCUT 1.5
+#define CLUSTERCUT 0.335
         int atom,cluster,cluster2,element,element2,largest_cluster;
         int phase=SUPPORT_PHASE;
         static int **matrix=NULL;
@@ -1703,10 +1709,12 @@ void generate_mask(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, in
         } 
         if(matrix==NULL)    {
 			 matrix =     (int**)malloc(nindex[phase]*sizeof(int*)) ;
-		         matrix[cluster]=(int*)malloc(rowsize[cluster]*sizeof(int));
+                         for(cluster=0;cluster<nindex[phase];cluster++)
+		             matrix[cluster]=(int*)malloc(rowsize[cluster]*sizeof(int));
         }
         for(cluster=0;cluster<nindex[phase];cluster++){
                 // let's start with size 1, we then will grow exponentially if needed.
+//printf("HERE %d matrix=%p %p\n",cluster,matrix,matrix[cluster]); fflush(stdout);
 		matrix[cluster]=(int*)realloc(matrix[cluster],rowsize[cluster]*sizeof(int));
         }
         // at the beginning we have one atom in each cluster;
@@ -1726,6 +1734,7 @@ void generate_mask(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, in
                         double distance,d[3];
                         int atom2,m;
                         atom2=matrix[cluster2][element2];
+//printf("checking %d (%d) - %d ;  %d (%d) - %d \n",cluster,element,atom1,cluster2,element2,atom2);
   			for(m=0;m<3;m++){
 			  d[m]=(gmx_coords)[gmx_index_phase[phase][atom1]][m] - (gmx_coords)[gmx_index_phase[phase][atom2]][m] ;
                         }
@@ -1745,6 +1754,18 @@ void generate_mask(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, in
                                      // let's add on top of the stack the complete matrix row 'cluster2'
 				     matrix[cluster][clustersize[cluster]+i]=matrix[cluster2][i];	
                                 }
+#if 0
+if(atom1==6737 || atom2==6737 ){
+                                printf("dist %d %d = %f\n",atom1,atom2,distance);
+				for(i=0;i<clustersize[cluster];i++){
+					printf("%d %d : %d\n",cluster, cluster2,matrix[cluster][i]);
+                                }
+				for(i=0;i<clustersize[cluster2];i++){
+					printf("%d %d : %d *\n",cluster, cluster2,matrix[cluster][clustersize[cluster]+i]);
+                                }
+                                printf("\n");
+}
+#endif
 				clustersize[cluster]+=clustersize[cluster2];
 				clustersize[cluster2]=0;
                                 break;
@@ -1765,6 +1786,12 @@ void generate_mask(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, in
  	for(element=0 ; element < clustersize[largest_cluster] ; element++) { 
 		(*mask)[matrix[largest_cluster][element]]=1;
 	}
+        if (1) {
+                printf("LARGEST CLUSTER SIZE=%d\n",clustersize[largest_cluster]);
+ 	     	FILE*list=fopen("list.dat","w");
+ 	        for(element=0 ; element < clustersize[largest_cluster] ; element++)  fprintf(list,"%d\n",matrix[largest_cluster][element]);
+       			
+        }
 }
 
 void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_index_phase,int * mask){
@@ -1871,6 +1898,7 @@ void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_
 	  } // end switch periodicity
 	}
         if(itim->nphases>itim->ngmxphases) itim->n[itim->nphases-1] = itim->n[INNER_PHASE]+itim->n[OUTER_PHASE];
+        itim->mask=mask;
 }
 
 Histogram * histo_init(int N, int nbins, real range) { 
