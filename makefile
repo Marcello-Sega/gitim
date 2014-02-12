@@ -1,10 +1,10 @@
 CC=gcc
-GROMACS=$(HOME)/gromacs-4.5.7/
+GROMACS=$(HOME)/gromacs-4.5.6/
 NO_DEBUG=-ggdb
 NO_VALGRIND=-g -fno-inline
 NO_PROFILE=-pg -fno-omit-frame-pointer
 NO_OMP=-DUSE_OMP
-TP=-DTIME_PROFILE
+NO_TP=-DTIME_PROFILE
 #
 #OPT=-O3 -Wall -pedantic -std=c99  -Werror -Wno-unused -Wuninitialized  -ffast-math -fopenmp
 OPT=-O -fno-inline 
