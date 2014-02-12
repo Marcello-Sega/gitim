@@ -1023,7 +1023,7 @@ typedef struct {
 	int (* add)(int,double,double);		
 	} Histogram;
 Histogram * histo_histo;
-
+unsigned long long int * int_histo;
 ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins,real * radii, int ** index, int *gnx,int *com_opt, int bOrder, int dump_mol, int bMCnormalization, const char ** geometry);
 
 real interpolate_distanceSphere(struct kdtree * Surface, real *P,real *normal, ITIM * itim);
@@ -1038,13 +1038,26 @@ void  finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth
 int add_histo(int N, double pos, double value){
 	int bin ;
 	bin = (int) (pos / histo_histo->bWidth);
-        if(bin<histo_histo->nbins && bin >=0){ histo_histo->rdata[N*histo_histo->nbins+bin] += value; return 1 ;} 
+        if(bin<histo_histo->nbins && bin >=0){ 
+               histo_histo->rdata[N*histo_histo->nbins+bin] += value;
+#ifdef INTEGER_HISTO
+               int_histo[N*histo_histo->nbins+bin]++;
+#endif
+               return 1 ;
+        } 
         return 0;
 }
 void dump_histo(int N, FILE*file){
 	int i;
 	for(i=0;i<histo_histo->nbins;i++) fprintf(file,"%f %f\n",i*histo_histo->bWidth,histo_histo->rdata[N*histo_histo->nbins+i]*1.0/histo_histo->iterations);
 }
+#ifdef INTEGER_HISTO
+void dump_int_histo(int N, FILE*file){
+	int i;
+        fprintf(file,"# iterations = %d   normalization to number density= %f\n",histo_histo->iterations,4*(global_itim->box[0] * global_itim->box[1])*histo_histo->bWidth );
+	for(i=0;i<histo_histo->nbins;i++) fprintf(file,"%f %llu\n",i*histo_histo->bWidth,int_histo[N*histo_histo->nbins+i]);
+}
+#endif
 void clear_histo(int N){
 	int i;
 	for(i=0;i<histo_histo->nbins;i++) histo_histo->rdata[N*histo_histo->nbins+i]=0;
@@ -2048,6 +2061,10 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
 	         itim->com_opt[i] = com_opt[i];
 
 	    histo_histo = histo_init(itim->n_histo, *nbins,(double) box[itim->normal][itim->normal] ) ; 
+#ifdef INTEGER_HISTO
+            int_histo = malloc(itim->n_histo*(*nbins)*sizeof(unsigned long long int));
+            for(i=0;i<itim->n_histo*(*nbins);i++) int_histo[i]=0; 
+#endif
             /* ngrps-1 because we are not computing the density of the SUPPORT_PHASE */
             itim->radii=  (real *)malloc(gnx[SUPPORT_PHASE]*sizeof(real));
 	    for(i=0;i<gnx[SUPPORT_PHASE];i++){
@@ -2070,14 +2087,18 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
 	*slWidth = histo->bWidth ;
 	for(i=0;i<itim->n_histo;i++){
 	   for(j=0;j<histo->nbins;j++){
-	//	   histo->rdata[ i * histo->nbins + j ] = 
-        //                           (histo->rdata[i* histo->nbins + j]) / 
-        //                           (histo->iterations );
-        //                           //(histo->iterations * *slWidth);
+#ifndef TO_INTEGRATE_CHARGES
+		   histo->rdata[ i * histo->nbins + j ] = 
+                                   (histo->rdata[i* histo->nbins + j]) / 
+                                   (histo->iterations * *slWidth);
+#endif
 
                    switch(itim->geometry){
-			case SURFACE_PLANE:// histo->rdata[ i * histo->nbins + j ]/=(2*(itim->box[0] * itim->box[1]));
-			break;
+			case SURFACE_PLANE: 
+#ifndef TO_INTEGRATE_CHARGES
+                           histo->rdata[ i * histo->nbins + j ]/=(2*(itim->box[0] * itim->box[1]));
+#endif
+			   break;
                         case SURFACE_SPHERE: 
                         case SURFACE_GENERIC: 
 			break;
@@ -2333,7 +2354,11 @@ This is too cluttered. Reorganize the code...
 				order[3]=iprod(v2,vn); order[3]=(3*order[3]*order[3] -1. )/2.; order2[3]=order[3]*order[3];
                  }
                  locnumber=1;
+#ifdef TO_INTEGRATE_CHARGES
 		 sampled=populate_histogram(j, dist, histo, itim,(real)((int)(1000*locmass)));
+#else
+		 sampled=populate_histogram(j, dist, histo, itim,(real)(locmass));
+#endif
                  //printf("SAMPLING %d %d %f %d\n",i,sampled,locmass,check+=locmass);
                  //printf("SAMPLING %d %d\n",i,sampled);
                
@@ -2344,7 +2369,7 @@ This is too cluttered. Reorganize the code...
 			         populate_histogram(OFF_ORDER1+j, dist, histo, itim,  order[0]);
 			         populate_histogram(OFF_ORDER1_2+j, dist, histo, itim,order2[0]);
 			         populate_histogram(OFF_ORDER2+j, dist, histo, itim,  order[1]);
-			         populate_histogram(OFF_ORDER2_2+j, dist, histo, itim,order2[1]);
+				 populate_histogram(OFF_ORDER2_2+j, dist, histo, itim,order2[1]);
 			         populate_histogram(OFF_ORDER3+j, dist, histo, itim,  order[2]);
 			         populate_histogram(OFF_ORDER3_2+j, dist, histo, itim,order2[2]);
 			         populate_histogram(OFF_ORDER4+j, dist, histo, itim,  order[3]);
@@ -2884,6 +2909,14 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 
 	if(dens_opt!='s')   
 	   finalize_intrinsic_profile(slDensity, nslices, slWidth);
+#ifdef INTEGER_HISTO
+        for(int j=INNER_PHASE;j<itim->nphases;j++){
+             char fname[4096];
+             sprintf(fname,"intHist.%d.dat",j);
+             FILE * cid=fopen(fname,"w");
+             dump_int_histo(j,cid);
+        }
+#endif
 
 }
 

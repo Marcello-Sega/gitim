@@ -7,7 +7,7 @@ NO_OMP=-DUSE_OMP
 NO_TP=-DTIME_PROFILE
 #
 #OPT=-O3 -Wall -pedantic -std=c99  -Werror -Wno-unused -Wuninitialized  -ffast-math -fopenmp
-OPT=-O -fno-inline 
+OPT=-O -fno-inline  -std=c99 -DINTEGER_HISTO
 all: g_density 
 
 clean: 
