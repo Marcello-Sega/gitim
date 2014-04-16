@@ -88,7 +88,7 @@ extern "C" {
 #endif
 
 // TODO: make it an option? change the algorithm ? 
-#define MAX_KDTREE_CHECK 40
+#define MAX_KDTREE_CHECK 60
 
 struct kdtree;
 struct kdres;
@@ -967,6 +967,7 @@ typedef struct {
 	real box[3];
 	real alpha;
 	real * masses;
+	real * charges;
 	real skin;
 	real range;
 	real *pradii;
@@ -1005,6 +1006,7 @@ typedef struct {
 ITIM * global_itim;
 real * global_real_pointer;
 real * global_masses=NULL;
+real * global_charges=NULL;
 
 typedef struct {
 	real * rdata;
@@ -1027,7 +1029,7 @@ real interpolate_distanceSphere(struct kdtree * Surface, real *P,real *normal, I
 real interpolate_distance3D_2(struct kdtree * Surface, real *P,real *normal, ITIM * itim);
 real interpolate_distance3D_3(struct kdtree * Surface, real *P,real *normal, ITIM * itim);
 
-void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top);
+void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top, char dens_opt);
 void  compute_intrinsic_order(matrix box, atom_id **index, t_topology * top);
 void  finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth);
 
@@ -1272,7 +1274,6 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 						ind = -1; break;
 					}
 				}
-
 				for(k=  0 ;  k < itim->com_opt[SUPPORT_PHASE] ; k++) { 
                                     /* let's go through all atoms in the tagged molecule ...  */
 				    ind = itim->com_opt[SUPPORT_PHASE] * ( index / itim->com_opt[SUPPORT_PHASE] ) + k;
@@ -1646,6 +1647,7 @@ void init_itim(int nphases) {
 	sprintf(itim->method_name[METHOD_ITIM],"itim");
 	sprintf(itim->method_name[METHOD_A_SHAPE],"alpha-shapes");
         itim->masses=global_masses;
+        itim->charges=global_charges; 
 	if(itim->masses==NULL) exit(printf("Internal error, itim->masses not allocated\n"));
 	itim->mesh.nelem=0;
 	itim->mesh.tree=NULL;
@@ -1667,8 +1669,10 @@ void init_itim(int nphases) {
 	        itim->phase_index[i]= NULL ;
 	        itim->phase[i] = NULL ;
 		itim->periodic[i]=NONE; 
-                itim->com_opt[i]=0;
 	}
+	for(i=0;i<64;i++){
+                itim->com_opt[i]=0;
+        }
         itim->dump_mol=0;
 	itim->periodic[INNER_PHASE]=NONE;
 	itim->dump_surface_points=dump_surface_points;
@@ -2012,7 +2016,7 @@ void  compute_intrinsic_surface(matrix box, int ngrps, rvec * gmx_coords, int *n
 	if(itim->info)fprintf(stderr,"Number of surface elements = %d\n",itim->nalphapoints);
 }
 
-void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top){  
+void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt){  
 	int i,j;
 	real pos,r;
 	ITIM*itim=global_itim;
@@ -2021,6 +2025,13 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 	     case SURFACE_PLANE:
         	for(i=0;i<itim->nalphapoints;i++){
         		if(fabs(itim->alphapoints[3*i])<itim->box[0]/2. && fabs(itim->alphapoints[3*i+1])<itim->box[0]/2.){
+                                real value ;
+                                switch(dens_opt){
+					case 'm': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].m; break;
+					case 'c': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].q; break;
+					case 'n': value = 1; break;
+					default : value =1 ; break;
+                                }
         			pos=itim->alphapoints[3*i+2];
           // printf("adding mass %f of atom type %s\n",top->atoms.atom[ itim->gmx_alpha_id[i] ].m,*(top->atoms.atomname[itim->gmx_alpha_id[i]]));
         			populate_histogram(SUPPORT_PHASE, pos, histo, itim,top->atoms.atom[ itim->gmx_alpha_id[i] ].m);
@@ -2032,11 +2043,19 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
              case SURFACE_GENERIC:
                 pos=0.0;
          	for(i=0;i<itim->nalphapoints;i++){
+                        real value ;
 			for(j=0;j<3;j++){
                 	   r=itim->alphapoints[3*i+j];
 			   pos+=r*r;
                         }
 			pos=sqrt(pos);
+
+                        switch(dens_opt){
+					case 'm': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].m; break;
+					case 'c': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].q; break;
+					case 'n': value = 1; break;
+					default : value =1 ; break;
+                        }
                 	populate_histogram(SUPPORT_PHASE, pos, histo, itim,top->atoms.atom[ itim->gmx_alpha_id[i] ].m);
                  }
 	     break;
@@ -2044,7 +2063,7 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
              break;
         }
 }
-void compute_histogram(matrix box,atom_id ** gmx_index_phase,t_topology * top){  
+void compute_histogram(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt){  
 /*************************************
 
           TODO TODO TODO 
@@ -2133,7 +2152,15 @@ This is too cluttered. Reorganize the code...
                      if(itim->bOrder) { order[0]=order[1]=order[2]=order[3]=0.0; 
                      		        order2[0]=order2[1]=order2[2]=order2[3]=0.0; } 
                      if(j<itim->ngmxphases){ /* to take in account the random phase */
-                            locmass=itim->masses[gmx_index_phase[j][i]];
+                            real value;
+                            switch(dens_opt){
+			    	case 'm': value = itim->masses[gmx_index_phase[j][i]]; break;
+			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
+			    	case 'n': value = 1; break;
+			    	default : value =1 ; break;
+                            }
+                            locmass=value;
+
 		            p4[0]=itim->phase[j][3*i]; p4[1]=itim->phase[j][3*i+1]; p4[2]=itim->phase[j][3*i+2];
                      } else { 
                             locmass=itim->box[0]*itim->box[1]*itim->box[2]/itim->n[j];
@@ -2212,8 +2239,8 @@ void reset_counters(){
 	itim->nalphapoints = 0;
 }
 
-void  compute_intrinsic_profile(matrix box, atom_id ** gmx_index_phase, t_topology * top){
-	compute_histogram(box,gmx_index_phase,top);
+void  compute_intrinsic_profile(matrix box, atom_id ** gmx_index_phase, t_topology * top, char dens_opt){
+	compute_histogram(box,gmx_index_phase,top,dens_opt);
 	reset_counters();
 }
 
@@ -2722,8 +2749,8 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		}
 		/* Compute the intrinsic profile */
 	        if(dens_opt!='s') {  
-		   compute_layer_profile(box, index, top ); 
- 		   compute_intrinsic_profile(box, index, top); 
+		   compute_layer_profile(box, index, top, dens_opt ); 
+ 		   compute_intrinsic_profile(box, index, top,dens_opt); 
                 }
   	} while (read_next_x(oenv,status,&t,natoms,x0,box));
 
@@ -2859,8 +2886,10 @@ exit(0);
 
 
   global_masses = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
+  global_charges = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
 
   for(i=0; (i<top->atoms.nr); i++)  global_masses[i] = top->atoms.atom[i].m;
+  for(i=0; (i<top->atoms.nr); i++)  global_charges[i] = top->atoms.atom[i].q;
   if (dens_opt[0][0] != 's'){
      if (dens_opt[0][0] == 'n') {
        for(i=0; (i<top->atoms.nr); i++){
@@ -2876,7 +2905,7 @@ exit(0);
   snew(ngx,ngrps);
  
   get_index(&top->atoms,ftp2fn_null(efNDX,NFILE,fnm),ngrps,ngx,index,grpname); 
-
+  for(i=0;i<64;i++) com_opt[i]=0;
   if(bCom) { 
      FILE* comfile;
      char comstr[1024],*pchar;
