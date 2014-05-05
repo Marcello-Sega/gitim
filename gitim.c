@@ -2464,8 +2464,9 @@ void init_itim(int nphases) {
 	        itim->phase_index[i]= NULL ;
 	        itim->phase[i] = NULL ;
 		itim->periodic[i]=NONE; 
-                itim->com_opt[i]=0;
 	}
+        for(i=0;i<64;i++)
+                itim->com_opt[i]=0;
 	itim->periodic[INNER_PHASE]=NONE;
 	itim->dump_surface_points=dump_surface_points;
 	itim->dump_surface_molecules=dump_surface_molecules;
