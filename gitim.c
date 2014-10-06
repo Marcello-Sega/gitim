@@ -981,6 +981,7 @@ typedef struct {
 	real box[3];
 	real alpha;
 	real * masses;
+	real * charges;
 	real skin;
 	real range;
 	real *pradii;
@@ -1021,6 +1022,7 @@ typedef struct {
 ITIM * global_itim;
 real * global_real_pointer;
 real * global_masses=NULL;
+real * global_charges=NULL;
 
 typedef struct {
 	real * rdata;
@@ -1043,7 +1045,7 @@ real interpolate_distanceSphere(struct kdtree * Surface, real *P,real *normal, I
 real interpolate_distance3D_2(struct kdtree * Surface, real *P,real *normal, ITIM * itim);
 real interpolate_distance3D_3(struct kdtree * Surface, real *P,real *normal, ITIM * itim);
 
-void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top);
+void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top, char dens_opt);
 void  compute_intrinsic_order(matrix box, atom_id **index, t_topology * top);
 void  finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth);
 
@@ -2443,6 +2445,7 @@ void init_itim(int nphases) {
 	sprintf(itim->method_name[METHOD_ITIM],"itim");
 	sprintf(itim->method_name[METHOD_A_SHAPE],"alpha-shapes");
         itim->masses=global_masses;
+        itim->charges=global_charges;
 	if(itim->masses==NULL) exit(printf("Internal error, itim->masses not allocated\n"));
 	itim->mesh.nelem=0;
 	itim->mesh.tree=NULL;
@@ -2891,7 +2894,7 @@ void  compute_intrinsic_surface(matrix box, int ngrps, rvec * gmx_coords, int *n
 	if(itim->info)fprintf(stderr,"Number of surface elements = %d\n",itim->nalphapoints);
 }
 
-void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top){  
+void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top,char dens_opt){  
 	int i,j;
 	real pos,r;
 	ITIM*itim=global_itim;
@@ -2900,8 +2903,16 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 	     case SURFACE_PLANE:
         	for(i=0;i<itim->nalphapoints;i++){
         		if(fabs(itim->alphapoints[3*i])<itim->box[0]/2. && fabs(itim->alphapoints[3*i+1])<itim->box[0]/2.){
+                                real value ;
+                                switch(dens_opt){
+                                       case 'm': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].m; break;
+                                       case 'c': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].q; break;
+                                       case 'n': value = 1; break;
+                                       default : value =1 ; break;
+                                }
+
         			pos=itim->alphapoints[3*i+2];
-        			populate_histogram(SUPPORT_PHASE, pos, histo, itim,top->atoms.atom[ itim->gmx_alpha_id[i] ].m);
+        			populate_histogram(SUPPORT_PHASE, pos, histo, itim, value);
         	        }
          	
                 }
@@ -2922,7 +2933,7 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
              break;
         }
 }
-void compute_histogram(matrix box,atom_id ** gmx_index_phase,t_topology * top){  
+void compute_histogram(matrix box,atom_id ** gmx_index_phase,t_topology * top,char dens_opt){  
 /*************************************
 
           TODO TODO TODO 
@@ -2978,7 +2989,15 @@ This is too cluttered. Reorganize the code...
                      if(j>=itim->ngmxphases){  exit(printf("Internal error\n")) ;} 
                      p4[0]=p4[1]=p4[2]=0.0;
                      for(k=0;k<itim->com_opt[j];k++){ // let's go through the molecule's atoms
-                            locm = itim->masses[gmx_index_phase[j][i+k]];
+                            real value;
+                            switch(dens_opt){
+                               case 'm': value = itim->masses[gmx_index_phase[j][i]]; break;
+                               case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
+                               case 'n': value = 1; break;
+                               default : value =1 ; break;
+                            }
+                            locm=value;
+
 			    locmass += locm;
                             for(dim=0;dim<3;dim++){ 
                                 newpos[dim]=itim->phase[j][3*(i+k)+dim] ;
@@ -3120,8 +3139,8 @@ void reset_counters(){
 	itim->nalphapoints = 0;
 }
 
-void  compute_intrinsic_profile(matrix box, atom_id ** gmx_index_phase, t_topology * top){
-	compute_histogram(box,gmx_index_phase,top);
+void  compute_intrinsic_profile(matrix box, atom_id ** gmx_index_phase, t_topology * top,char dens_opt){
+	compute_histogram(box,gmx_index_phase,top,dens_opt);
 	reset_counters();
 }
 
@@ -3627,8 +3646,8 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		}
 		/* Compute the intrinsic profile */
 	        if(dens_opt!='s') {  
-		   compute_layer_profile(box, index, top ); 
- 		   compute_intrinsic_profile(box, index, top); 
+		   compute_layer_profile(box, index, top,dens_opt ); 
+ 		   compute_intrinsic_profile(box, index, top,dens_opt); 
                 }
 #ifdef ALPHA
 		qh_freeqhull(!qh_ALL);  
@@ -3755,8 +3774,11 @@ geometry[0]=geometry[1];
 
 
   global_masses = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
+  global_charges = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
 
   for(i=0; (i<top->atoms.nr); i++)  global_masses[i] = top->atoms.atom[i].m;
+  for(i=0; (i<top->atoms.nr); i++)  global_charges[i] = top->atoms.atom[i].q;
+
   if (dens_opt[0][0] != 's'){
      if (dens_opt[0][0] == 'n') {
        for(i=0; (i<top->atoms.nr); i++){
@@ -3772,6 +3794,7 @@ geometry[0]=geometry[1];
   snew(ngx,ngrps);
  
   get_index(&top->atoms,ftp2fn_null(efNDX,NFILE,fnm),ngrps,ngx,index,grpname); 
+  for(i=0;i<64;i++) com_opt[i]=0;
 
   if(bCom) { 
      FILE* comfile;
