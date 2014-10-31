@@ -2296,7 +2296,7 @@ int get_electrons(t_electron **eltab, const char *fn)
     if (sscanf(buffer, "%s = %d", tempname, &tempnr) != 2)
       gmx_fatal(FARGS,"Invalid line in datafile at line %d\n",i+1);
     (*eltab)[i].nr_el = tempnr;
-    (*eltab)[i].atomname = strdup(tempname);
+    sprintf((*eltab)[i].atomname ,tempname);
   }
   ffclose(in);
   
@@ -2308,7 +2308,7 @@ int get_electrons(t_electron **eltab, const char *fn)
   return nr;
 }
 
-void remove_phase_pbc(t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
+void remove_phase_pbc(int ePBC, t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
      /*we assume here that atoms have been already put into the box */
      /* compute the density at different control points: box edges, middle + some more */
      int rho[5],rho_max,i,nbins=25; 
@@ -2321,7 +2321,7 @@ void remove_phase_pbc(t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *
      	   for(i=0; (i<atoms->nr); i++) {
 	   	x0[i][axis]+=shift;
 	   }
-	   put_atoms_in_box(box,atoms->nr,x0);
+	   put_atoms_in_box(ePBC,box,atoms->nr,x0);
          }
          rho[0]=rho[1]=rho[2]=rho[3]=rho[4]=0;
          for(i=0; (i<index_nr); i++) {
@@ -2456,7 +2456,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
 	  /* determine which slice atom is in */
 	  slice = (z / (*slWidth)); 
 	  sought.nr_el = 0;
-	  sought.atomname = strdup(*(top->atoms.atomname[index[n][i]]));
+	  sprintf(sought.atomname, *(top->atoms.atomname[index[n][i]]));
 
 	  /* now find the number of electrons. This is not efficient. */
 	  found = (t_electron *)
@@ -2731,9 +2731,9 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 // (SAW) BUG : when no pbc are defined, it loops forever... 
     		gmx_rmpbc(gpbc,natoms,box,x0);
                 if(bCenter){
-		    put_atoms_in_box(box,natoms,x0);
+		    put_atoms_in_box(ePBC,box,natoms,x0);
 	            /* Make our reference phase whole */
-		    remove_phase_pbc(&top->atoms,box, x0, axis, index[0], gnx[0]);
+		    remove_phase_pbc(ePBC,&top->atoms,box, x0, axis, index[0], gnx[0]);
                 }
 		/* Now center the com of the reference phase in the middle of the box (the one from -box/2 to box/2, 
                    not the gromacs std one:), and shift/rebox the rest accordingly */
