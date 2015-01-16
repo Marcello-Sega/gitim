@@ -4,11 +4,15 @@ INCLUDE (CheckIncludeFiles)
 set_source_files_properties(g_density.c PROPERTIES LANGUAGE CXX )
 set_source_files_properties(gmx_density.c PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
-
-MESSAGE(STATUS "set the variables MYGMX_SRC  and MYGMX_BUILD to specify a particular path for gromacs source and build directories" )
-IF(VIRIAL_EXTENSION)
-	 add_definitions(-DVIRIAL_EXTENSION)
-ENDIF(VIRIAL_EXTENSION)
+SET(ENVSRCDIR $ENV{MYGMX_SRC})
+SET(ENVBLDDIR $ENV{MYGMX_BUILD})
+if(NOT ENVSRCDIR)
+	MESSAGE(STATUS $ENV{MYGMX_SRC})
+	MESSAGE(FATAL_ERROR "\nERROR: set the variables MYGMX_SRC  and MYGMX_BUILD to specify a particular path for gromacs source and build directories" )
+endif(NOT ENVSRCDIR)
+#IF(VIRIAL_EXTENSION)
+#	 add_definitions(-DVIRIAL_EXTENSION)
+#ENDIF(VIRIAL_EXTENSION)
 # these are possible locatsions of gromacs' distribution source / headers / libraries
 SET( GMX
 "$ENV{MYGMX_BUILD}/"
@@ -21,7 +25,7 @@ SET( GMX
 # these are possible subdirectories where to find headers/libs, for each of the GMX dirs. This
 # should take care of the tree differences between gmx v. 4 and v. 5, and minimize the changes in
 # the code.
-SET (HEADER_SUBDIRS "include" "src/" "src/gmxlib"  "src/gromacs/" "src/gromacs/utility" "src/gromacs/gmxana/" "src/gromacs/math/" "src/gromacs/fileio/" "src/gromacs/math/" "src/gromacs/pbcutil/" "src/gromacs/legacyheaders/" "src/gromacs/selection/" "lib/" )
+SET (HEADER_SUBDIRS "include" "src/" "src/gmxlib"  "src/gromacs/" "src/gromacs/utility" "src/gromacs/gmxana/" "src/gromacs/math/" "src/gromacs/fileio/" "src/gromacs/math/" "src/gromacs/pbcutil/" "src/gromacs/legacyheaders/" "src/gromacs/selection/" "lib/" "gmxlib"  "gromacs/" "gromacs/utility" "gromacs/gmxana/" "gromacs/math/" "gromacs/fileio/" "gromacs/math/" "gromacs/pbcutil/" "gromacs/legacyheaders/" "gromacs/selection/" )
 
 # let's combine everything
 SET(MYPATHS    ${GMX})
@@ -53,6 +57,7 @@ ENDIF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
 
 MESSAGE(STATUS "============================================================")
 MESSAGE(STATUS "GMX version: ${GMX_VERSION}    on    ${CMAKE_HOST_SYSTEM}   ")
+ADD_DEFINITIONS(-DGMX_VERSION=${GMX_VERSION})
 MESSAGE(STATUS "============================================================")
 
 ### version 4.6.x
@@ -67,6 +72,8 @@ IF(${GMX_VERSION} VERSION_LESS 50000)
 		SET (DYNAMIC_LIBFILE libgmx.so)
 	ENDIF( CMAKE_HOST_SYSTEM MATCHES Darwin)
 ELSE(${GMX_VERSION} VERSION_LESS 50000) 
+
+### version 5.x.x
 	SET (HEADERLIST "version.h" "string.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gmxpre.h")
 	SET (STATIC_LIBFILE libgromacs.a)
 	IF( CMAKE_HOST_SYSTEM MATCHES Darwin)
@@ -75,6 +82,8 @@ ELSE(${GMX_VERSION} VERSION_LESS 50000)
 		SET (DYNAMIC_LIBFILE libgromacs.so)
 	ENDIF( CMAKE_HOST_SYSTEM MATCHES Darwin)
 ENDIF(${GMX_VERSION} VERSION_LESS 50000) 
+
+### endof version-dependent part
 
 FIND_PATH(GROMACS_LIBGMX_STATIC NAMES ${STATIC_LIBFILE} PATHS ${MYPATHS})
 FIND_PATH(GROMACS_LIBGMX_DYNAMIC NAMES ${DYNAMIC_LIBFILE} PATHS ${MYPATHS})
@@ -117,8 +126,8 @@ ENDIF(NOT GROMACS_LIBGMX)
 
 MESSAGE(STATUS "")
 MESSAGE(STATUS "==================================================")
-MESSAGE(STATUS "Using libraries in: ${GROMACS_LIB_DIR} ")
-MESSAGE(STATUS "Using headers in: ${GROMACS_INC_DIR1} ${GROMACS_INC_DIR2}  ")
+MESSAGE(STATUS "Using libraries in: ${GROMACS_LIBGMX} ")
+MESSAGE(STATUS "Using headers in: ${TMPDIR}")
 MESSAGE(STATUS "==================================================")
 MESSAGE(STATUS "")
 
