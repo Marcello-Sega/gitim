@@ -198,9 +198,7 @@ typedef struct {
 	void (* dump_slabs)(t_topology*);		
 	void (* dump_surface_molecules)(t_topology*,FILE*,atom_id **);		
 	void (* dump_phase_points)(PHASE,t_topology*,FILE*);		
-	Histogram * histo;
-	Histogram * histo_layers_n;
-	Histogram * histo_layers_p;
+	Histogram * histograms;
 
 } ITIM;
 
@@ -1206,6 +1204,68 @@ void dump_histo(Histogram * histo,int N, FILE*file){
 	int i;
 	for(i=0;i<histo->nbins;i++) fprintf(file,"%f %f\n",i*histo->bWidth,histo->rdata[N*histo->nbins+i]*1.0/histo->iterations);
 }
+
+typedef enum {LAYER_DISTRIBUTION=0,INTRINSIC_DENSITY=1,INTRINSIC_ORDER=2,COMPUTE_SIZE=3} HISTO_TYPE; 
+typedef enum {ATOMIC=0,MOLECULAR=1} HISTO_MOLTYPE; 
+
+int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int line){
+	int index = 0, i,moltype,n;
+	ITIM * itim = global_itim;
+	for (moltype=ATOMIC;moltype<=MOLECULAR;moltype++){
+        	if(layer!=0 && phase!=SUPPORT_PHASE) { 
+        	    exit(printf("Internal error: layer intrinsic profile only possible for the support phase\n"));
+        	}
+        	for(i=1;i<itim->maxlayers+1;i++){ // two (layer + intrinsic) histograms x number of layers for the support phase 
+        	    	if(moltype == molecular && TYPE==LAYER_DISTRIBUTION && layer==i  && phase==SUPPORT_PHASE) return index;
+        	    	index++;
+        	    	if(moltype == molecular && TYPE==INTRINSIC_DENSITY  && layer==i  && phase==SUPPORT_PHASE) return index;
+        	    	index++;
+        	}
+        }
+        for(n=SUPPORT_PHASE+1;n<itim->nphases-1;n++){ // one (intrinsic) histogram for each of the other phases
+            	if(molecular == ATOMIC && phase==n && TYPE==INTRINSIC_DENSITY) return index;
+            	index++;
+        }
+        if (TYPE==INTRINSIC_ORDER) {
+                exit(printf("Internal error: order profiles to be checked\n"));
+        } 
+       if(TYPE==COMPUTE_SIZE){
+       	return index;   	
+       } else { 
+	 exit(printf("Internal error: GET_HISTO_INDEX() called with wrong arguments at line %d: TYPE=%d, phase=%d, molecular=%d, layer=%d\n",line,TYPE,phase,molecular,layer));
+       }
+}
+
+int GET_HISTO_SIZE(void) {
+ return GET_HISTO_INDEX(COMPUTE_SIZE,0, 0, 0,__LINE__);
+}
+
+void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn){
+   ITIM*itim=global_itim;
+   int nphases = itim->nphases-1;
+   FILE *cid = fopen(fn,"w");
+   static const char *modif[]={"atomic","molecular"} ;
+   int column=1,moltype,i,j,n;
+   fprintf(cid,"#column %d : position \n",column); column++;		
+   for (moltype=0;moltype<=MOLECULAR-ATOMIC;moltype++){
+      for(i=1;i<itim->maxlayers+1;i++){
+	fprintf(cid,"#column %d : %s distribution %s layer %d\n",column,modif[moltype],grpmname[0],i); column++;		
+	fprintf(cid,"#column %d : %s density %s layer %d\n",column,modif[moltype],grpmname[0],i); column++;		
+      }
+   }
+   for(n=SUPPORT_PHASE+1;n<nphases;n++){
+     fprintf(cid,"#column %d : %s density %s\n",column,modif[ATOMIC],grpmname[n]); column++;
+     fflush(cid);
+   }
+   for(j=0;j<histo->nbins;j++) { 
+     fprintf(cid,"%f ",j*histo->bWidth);
+     for (i=0;i<itim->n_histo;i++){
+        fprintf(cid," %f ",histo->rdata[i*histo->nbins+j]*1.0/histo->iterations);
+     }
+     fprintf(cid,"\n");
+   }
+}
+
 #ifdef INTEGER_HISTO
 void dump_int_histo(Histogram * histo,int N, FILE*file){
 	int i;
@@ -1266,6 +1326,7 @@ real interpolate_distance(real *A,real *B,real *C,real *I){
 	       B[2]*(  ci[0]*ac[1] - ci[1]*ac[0] )  / F +
 	       C[2]*(  ai[0]*ba[1] - ai[1]*ba[0] )  / F ;
 }
+
 
 
 real interpolate_distanceSphere(struct kdtree * Surface, real *P,real *normal, ITIM * itim){
@@ -1474,6 +1535,7 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 		if(flag==0) { 
 			flag=1; // if already done, don't add this particle anymore.
 			itim->mask[index]=itim->current_layer;
+
 			if(itim->current_layer==1) { 
 		          itim->alpha_index[itim->nalphapoints] = index;
 			  if(itim->alphapoints==NULL) exit(printf("Error reallocating alphapoints\n"));
@@ -2159,6 +2221,44 @@ void generate_mask_ns(int bCluster, rvec * gmx_coords, int ** mask, int *nindex,
 	}
 }
 
+void spol_atom2molindex(int *n, int *index, int*backindex, t_block *mols)
+{
+    int nmol, i, j, m;
+
+    nmol = 0;
+    i    = 0;
+    while (i < *n)
+    {
+        m = 0;
+        while (m < mols->nr && index[i] != mols->index[m])
+        {
+            m++;
+	  //  printf("while (m =%d< mols->nr = %d && index[%d]=%d !=  mols->index[m] = %d) \n",m,mols->nr ,i,index[i],mols->index[m]);	
+        }
+        if (m == mols->nr)
+        {
+            gmx_fatal(FARGS, "index[%d]=%d does not correspond to the first atom of a molecule", i+1, index[i]+1);
+        }
+        for (j = mols->index[m]; j < mols->index[m+1]; j++)
+        {
+            if (i >= *n || index[i] != j)
+            {
+                gmx_fatal(FARGS, "The index group is not a set of whole molecules");
+            }
+            index[i++]=m;
+          //  printf("inside: index[%d]=%d mols->index[%d]=%d\n",i-1,index[i-1],m,mols->index[m]);
+        }
+    }
+    backindex[0]=0;
+    for(i=1;i<*n;i++){
+        if(index[i]!=index[i-1])
+           *(++backindex)=i;
+    }
+    *(++backindex) = *n;
+}
+
+
+
 void reinit_mask(ITIM * itim){
 	if(itim->bInclusive){
 	   int atom;
@@ -2306,11 +2406,11 @@ Histogram * histo_init(Histogram * histo, int N, int nbins, double range) {
 	return  histo;
 }
 
-static int populate_histogram(int phase, real dist, Histogram * histo, ITIM * itim, real value){
+static int populate_histogram(int index, real dist, Histogram * histo, ITIM * itim, real value){
             /* we have values from -box/2 to box/2, let's shift them back to gromacs convention (0:box)*/
 	    dist += histo->size/2.;
 	    if(dist<histo->size && dist>=0){ 
-	 		return add_histo(histo,phase,(double)dist,(double)value);
+	 		return add_histo(histo,index,(double)dist,(double)value);
 	    } 	
 	    return 0;
 }
@@ -2413,11 +2513,11 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
             itim->bOrder=bOrder;
             itim->bInclusive=bInclusive;
             itim->bMCnormalization=bMCnormalization;
-            itim->n_histo=2*itim->nphases;
+            itim->n_histo=GET_HISTO_SIZE();
             itim->dump_mol=dump_mol;
             /* 1 mass dens x phases  (+random phase),  ( 1 number dens , 4 order, 4 error on order) x phases */
  //TODO: comment this better
-            if(itim->bOrder) itim->n_histo = itim->nphases +  (1+4+4) * itim->ngmxphases;
+            if(itim->bOrder) exit(printf("Internal error: this has to be redone\n"));
      	    itim->alpha=alpha;
 	    itim->skin=0.0;  // TODO: CMDLINE ?
 	    itim->range=10.0; // TODO: CMDLINE ? check the other comment about range...
@@ -2433,14 +2533,11 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
             /* itim->com_opt[] are by default zero */
             for(i=0;i<itim->ngmxphases;i++)
 	         itim->com_opt[i] = com_opt[i];
-	    itim->histo = histo_init(itim->histo, itim->n_histo, *nbins,(double) box[itim->normal][itim->normal]) ; 
-            itim->histo_layers_n = histo_init(itim->histo_layers_n,1, itim->maxlayers,(double) itim->maxlayers) ; 
-            itim->histo_layers_p = histo_init(itim->histo_layers_p,1, itim->maxlayers,(double) itim->maxlayers) ; 
+	    itim->histograms = histo_init(itim->histograms, itim->n_histo, *nbins,(double) box[itim->normal][itim->normal]) ; 
 #ifdef INTEGER_HISTO
             int_histo = malloc(itim->n_histo*(*nbins)*sizeof(unsigned long long int));
             for(i=0;i<itim->n_histo*(*nbins);i++) int_histo[i]=0; 
 #endif
-            /* ngrps-1 because we are not computing the density of the SUPPORT_PHASE */
             itim->radii=  (real *)malloc(gnx[SUPPORT_PHASE]*sizeof(real));
 	    for(i=0;i<gnx[SUPPORT_PHASE];i++){
 		itim->radii[i] = radii[gmx_index[SUPPORT_PHASE][i]];
@@ -2452,53 +2549,51 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
 void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth){
 	int i,j;
 	ITIM *itim = global_itim;
-	Histogram * histo = itim->histo;
-  	*density = (real **) malloc( itim->n_histo* sizeof(real*));
+	Histogram * histo = itim->histograms;
+  	*density = (real **) malloc( itim->maxlayers*itim->n_histo* sizeof(real*));
 	for(i=0;i<itim->n_histo;i++){
 	    (*density)[i]=(real*) malloc(histo->nbins * sizeof(real));
         }
 	/* Let's re-determine the number of slices, given the minimum box-size found during the run*/
 	*nslices = (int)((histo->minsize*(histo->nbins-1)) / histo->size);  
 	*slWidth = histo->bWidth ;
-	for(i=0;i<itim->n_histo;i++){
-	   for(j=0;j<histo->nbins;j++){
+    	for(i=0;i<itim->n_histo;i++){
+  	  for(j=0;j<histo->nbins;j++){
 #ifndef TO_INTEGRATE_CHARGES
-		   histo->rdata[ i * histo->nbins + j ] = 
-                                   (histo->rdata[i* histo->nbins + j]) / 
-                                   (histo->iterations * *slWidth);
+  		histo->rdata[ i * histo->nbins + j ] = 
+                                     (histo->rdata[i* histo->nbins + j]) / 
+                                     (histo->iterations * *slWidth);
 #endif
-
-                   switch(itim->geometry){
-			case SURFACE_PLANE: 
+  
+                switch(itim->geometry){
+  		  case SURFACE_PLANE: 
 #ifndef TO_INTEGRATE_CHARGES
-                           histo->rdata[ i * histo->nbins + j ]/=(2*(itim->box[0] * itim->box[1]));
+                             histo->rdata[ i * histo->nbins + j ]/=(2*(itim->box[0] * itim->box[1]));
 #endif
-			   break;
-                        case SURFACE_SPHERE: 
-                        case SURFACE_GENERIC: 
-			break;
-                        default: break;
-                   }
-	   }
-	}
+  			  break;
+                  case SURFACE_SPHERE: 
+                  case SURFACE_GENERIC: 
+  			break;
+                  default: break;
+                 }
+  	}
         /* let's apply normalizations...*/
         if(itim->bMCnormalization){
-	     for(i=0;i<itim->n_histo;i++){
+  	   for(i=0;i<itim->n_histo;i++){
                 if(i==RANDOM_PHASE) continue;
-	   	for(j=0;j<histo->nbins;j++){
+  	 	for(j=0;j<histo->nbins;j++){
                         double norm =  histo->rdata[RANDOM_PHASE*histo->nbins + j ];
                         if(norm>0) histo->rdata[ i * histo->nbins + j ] /= norm ;
                 }
              }
         }
-
-	for(i=0;i<itim->n_histo;i++){
-	   for(j=0;j<histo->nbins;j++){
-		(*density)[i][j] = (real)histo->rdata[ i * histo->nbins+j];
-           }
-	}
-
-//printf("box=%f, histo->size= %f = %f, bWidth=%f, nitem=%d =%d, bw*nit=%f\n",itim->box[2],histo->size,histo->minsize,histo->bWidth,histo->nbins,*nslices,histo->nbins*histo->bWidth);
+  
+  	for(i=0;i<itim->n_histo;i++){
+  	   for(j=0;j<histo->nbins;j++){
+  		(*density)[i][j] = (real)histo->rdata[ i * histo->nbins+j];
+             }
+  	}
+     }
 }
 void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_coords, int *nindex, atom_id ** gmx_index_phase,t_topology * top, int natoms, t_pbc pbc){
 	
@@ -2546,11 +2641,11 @@ void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_
 }
 
 void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt, t_trxframe * fr){  
-	int i,j;
+	int i,j,n;
 	real pos,r, tmpreal;
 	rvec tmprvec;
 	ITIM*itim=global_itim;
-	Histogram *histo=itim->histo;
+	Histogram *histo=itim->histograms;
         switch (itim->geometry) { 	
 	     case SURFACE_PLANE:
         	for(i=0;i<itim->nalphapoints;i++){
@@ -2571,7 +2666,7 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
                                 }
         			pos=itim->alphapoints[3*i+2];
           // printf("adding mass %f of atom type %s\n",top->atoms.atom[ itim->gmx_alpha_id[i] ].m,*(top->atoms.atomname[itim->gmx_alpha_id[i]]));
-        			populate_histogram(SUPPORT_PHASE, pos, histo, itim,value);
+        			//populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,SUPPORT_PHASE,1,ATOMIC,__LINE__), pos, histo, itim,value);
         	        }
          	
                 }
@@ -2593,7 +2688,7 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 					case 'n': value = 1; break;
 					default : value =1 ; break;
                         }
-                	populate_histogram(SUPPORT_PHASE, pos, histo, itim,top->atoms.atom[ itim->gmx_alpha_id[i] ].m);
+             		//populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,SUPPORT_PHASE,1,ATOMIC,__LINE__), pos, histo, itim,top->atoms.atom[ itim->gmx_alpha_id[i] ].m);
                  }
 	     break;
              default: exit(printf("Error: histogram for geometry type %d not implemented\n",itim->geometry)) ;
@@ -2611,7 +2706,7 @@ This is too cluttered. Reorganize the code...
 
  ************************************/
     ITIM * itim=global_itim;
-    Histogram * histo = itim->histo; 
+    Histogram *histo = itim->histograms; 
     static real * result_points = NULL;
     real dist =0,check=0.0;
     int i,j,k,dim,sampled;
@@ -2648,12 +2743,43 @@ This is too cluttered. Reorganize the code...
 
     if(2*size<histo->minsize) histo->minsize=2*size;
     histo->iterations++;
-    for(j=INNER_PHASE;j<itim->nphases;j++){
-  	/*This is Miguel's original algorithm. */
+    for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
+    printf("g: %d el: %d\n",j,itim->n[j]);
+    }
+    for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
+	int isizem, *indexm,*backindex;
+	int molecular_layer,atomic_layer;
+	isizem=itim->n[j];
+	snew(indexm,isizem);
+	snew(backindex,top->mols.nr+1);
+
         if(j==RANDOM_PHASE && !itim->bMCnormalization) continue;
+
+	for(i=0;i<itim->n[j];i++) indexm[i]=itim->gmx_index[j][i]; // NOTE: TODO check "additional"  under the PATCH case
+	printf("GROUP=%d\n",j);
+        spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
+  	/*This is Miguel's original algorithm. */
 	for(i=0;i<itim->n[j];i++){
+		molecular_layer=0;
+		atomic_layer=0;
                 real locmass=0.0,locm,locnumber;
                 rvec v1,v2,vm,vn,newpos,oldpos;
+		if(j==SUPPORT_PHASE){
+			int mol = indexm[i];
+			int i1 = backindex[mol] ;
+			int i2 = backindex[mol+1];
+			int minlayer=100000;
+			int k;
+			//printf("checking boundaries of mol %d (atom %d) = %d %d\n",mol,i,i1,i2);
+			for(k=i1;k<i2;k++){
+			//	printf("\t mask[%d]=%d\n",k,itim->mask[k]);
+				if (itim->mask[k] >0 && itim->mask[k] < minlayer ) { 
+					minlayer = itim->mask[k];
+				}
+			}	
+			molecular_layer= ( minlayer==100000 ? 0 :minlayer) ;	
+			atomic_layer =itim->mask[i]; 
+		}
                 if(itim->com_opt[j]) {
                      if(j>=itim->ngmxphases){  exit(printf("Internal error\n")) ;} 
                      p4[0]=p4[1]=p4[2]=0.0;
@@ -2755,11 +2881,24 @@ This is too cluttered. Reorganize the code...
 #ifdef TO_INTEGRATE_CHARGES
 		 sampled=populate_histogram(j, dist, histo, itim,(real)((int)(1000*locmass)));
 #else
-		 sampled=populate_histogram(j, dist, histo, itim,(real)(locmass));
+		 if(j==SUPPORT_PHASE){
+			if(atomic_layer>0){
+		 		sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,atomic_layer,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
+		 		sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,j,atomic_layer,ATOMIC,__LINE__), p4[2], histo, itim,(real)(locmass));
+			}
+			
+			if(molecular_layer>0){
+				sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,molecular_layer,MOLECULAR,__LINE__), dist, histo, itim,(real)(locmass));
+				sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,j,molecular_layer,MOLECULAR,__LINE__), p4[2], histo, itim,(real)(locmass));
+			}
+		 } else { 
+		 	sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,0,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
+		 }
 #endif
                  //printf("SAMPLING %d %d %f %d\n",i,sampled,locmass,check+=locmass);
                  //printf("SAMPLING %d %d\n",i,sampled);
                
+#if 0
                  if(normal[0]!=NORMAL_UNDEFINED) /*SAW: TODO NOTE that this creates an inconsistency between the counting of masss profile and the others. Should one just drop points which do not have a triangle associated on the surface, or should we use the macroscopic vector in those cases? See perform_interpolation() for the handling of pathological cases.*/
                     if( j < itim->ngmxphases ) { 
 		              populate_histogram(OFF_NUMBER+j, dist, histo, itim,locnumber);
@@ -2774,7 +2913,10 @@ This is too cluttered. Reorganize the code...
 			         populate_histogram(OFF_ORDER4_2+j, dist, histo, itim,order2[3]);
                              }
                     }
+#endif
 	}
+	free(indexm);
+	free(backindex);
     }
 #ifdef TIME_PROFILE
     gettimeofday(&tp2, NULL);
@@ -3543,6 +3685,8 @@ exit(0);
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
     calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0]);
+    plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm));
+
   } else { 	
     if (dens_opt[0][0] == 'e') {
       nr_electrons =  get_electrons(&el_tab,ftp2fn(efDAT,NFILE,fnm));
@@ -3555,10 +3699,10 @@ exit(0);
       calc_density(ftp2fn(efTRX,NFILE,fnm),index, ngx, &density, &nslices, top, 
   		 ePBC, axis, ngrps, &slWidth, bCenter,oenv); 
     
-  }
     plot_density(density, opt2fn("-o",NFILE,fnm),
 	       nslices, ngrps, grpname, slWidth, dens_opt,
 	       bSymmetrize,oenv);
+  }
   do_view(oenv,opt2fn("-o",NFILE,fnm), "-nxy");       /* view xvgr file */
   return 0;
 }
