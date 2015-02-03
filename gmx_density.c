@@ -1240,12 +1240,16 @@ int GET_HISTO_SIZE(void) {
  return GET_HISTO_INDEX(COMPUTE_SIZE,0, 0, 0,__LINE__);
 }
 
-void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn){
+void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn, char dens_opt){
    ITIM*itim=global_itim;
    int nphases = itim->nphases-1;
    FILE *cid = fopen(fn,"w");
    static const char *modif[]={"atomic","molecular"} ;
    int column=1,moltype,i,j,n;
+   real factor=1;
+   switch(dens_opt){
+	case 'm': factor = AMU/(NANO*NANO*NANO); break;
+   }
    fprintf(cid,"#column %d : position \n",column); column++;		
    for (moltype=0;moltype<=MOLECULAR-ATOMIC;moltype++){
       for(i=1;i<itim->maxlayers+1;i++){
@@ -1260,7 +1264,7 @@ void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn){
    for(j=0;j<histo->nbins;j++) { 
      fprintf(cid,"%f ",j*histo->bWidth);
      for (i=0;i<itim->n_histo;i++){
-        fprintf(cid," %f ",histo->rdata[i*histo->nbins+j]*1.0/histo->iterations);
+        fprintf(cid," %f ",histo->rdata[i*histo->nbins+j] * factor);
      }
      fprintf(cid,"\n");
    }
@@ -2560,15 +2564,13 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
     	for(i=0;i<itim->n_histo;i++){
   	  for(j=0;j<histo->nbins;j++){
 #ifndef TO_INTEGRATE_CHARGES
-  		histo->rdata[ i * histo->nbins + j ] = 
-                                     (histo->rdata[i* histo->nbins + j]) / 
-                                     (histo->iterations * *slWidth);
+  		histo->rdata[ i * histo->nbins + j ] /= (histo->iterations * *slWidth); 
 #endif
-  
                 switch(itim->geometry){
   		  case SURFACE_PLANE: 
 #ifndef TO_INTEGRATE_CHARGES
                              histo->rdata[ i * histo->nbins + j ]/=(2*(itim->box[0] * itim->box[1]));
+			     //printf("CALLED i=%d j=%d h=%f\n",i,j, histo->rdata[ i * histo->nbins + j ]);
 #endif
   			  break;
                   case SURFACE_SPHERE: 
@@ -2576,7 +2578,8 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
   			break;
                   default: break;
                  }
-  	}
+  	   }
+	}
         /* let's apply normalizations...*/
         if(itim->bMCnormalization){
   	   for(i=0;i<itim->n_histo;i++){
@@ -2593,7 +2596,6 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
   		(*density)[i][j] = (real)histo->rdata[ i * histo->nbins+j];
              }
   	}
-     }
 }
 void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_coords, int *nindex, atom_id ** gmx_index_phase,t_topology * top, int natoms, t_pbc pbc){
 	
@@ -3685,7 +3687,7 @@ exit(0);
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
     calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0]);
-    plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm));
+    plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm),dens_opt[0][0]);
 
   } else { 	
     if (dens_opt[0][0] == 'e') {
