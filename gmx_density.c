@@ -2757,9 +2757,10 @@ This is too cluttered. Reorganize the code...
 
         if(j==RANDOM_PHASE && !itim->bMCnormalization) continue;
 
-	for(i=0;i<itim->n[j];i++) indexm[i]=itim->gmx_index[j][i]; // NOTE: TODO check "additional"  under the PATCH case
-	printf("GROUP=%d\n",j);
-        spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
+	if(!(j==RANDOM_PHASE && !itim->bMCnormalization)) {
+		for(i=0;i<itim->n[j];i++) indexm[i]=itim->gmx_index[j][i]; // NOTE: TODO check "additional"  under the PATCH case
+                spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
+	}
   	/*This is Miguel's original algorithm. */
 	for(i=0;i<itim->n[j];i++){
 		molecular_layer=0;
