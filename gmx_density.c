@@ -1222,7 +1222,7 @@ int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int lin
         	    	index++;
         	}
         }
-        for(n=SUPPORT_PHASE+1;n<itim->nphases-1;n++){ // one (intrinsic) histogram for each of the other phases
+        for(n=SUPPORT_PHASE+1;n<itim->nphases;n++){ // one (intrinsic) histogram for each of the other phases
             	if(molecular == ATOMIC && phase==n && TYPE==INTRINSIC_DENSITY) return index;
             	index++;
         }
@@ -1262,7 +1262,7 @@ void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn, 
      fflush(cid);
    }
    for(j=0;j<histo->nbins;j++) { 
-     fprintf(cid,"%f ",j*histo->bWidth);
+     fprintf(cid,"%f ",(j-histo->nbins/2)*histo->bWidth);
      for (i=0;i<itim->n_histo;i++){
         fprintf(cid," %f ",histo->rdata[i*histo->nbins+j] * factor);
      }
@@ -2231,14 +2231,20 @@ void spol_atom2molindex(int *n, int *index, int*backindex, t_block *mols)
 
     nmol = 0;
     i    = 0;
+    m=0;
+    while (m < mols->nr) {
+	backindex[m]=-1;
+	m++;
+    }
     while (i < *n)
     {
         m = 0;
-        while (m < mols->nr && index[i] != mols->index[m])
+        while (m < mols->nr &&  ! ( mols->index[m] <= index[i]  && index[i] < mols->index[m+1] ) ) 
         {
             m++;
 	  //  printf("while (m =%d< mols->nr = %d && index[%d]=%d !=  mols->index[m] = %d) \n",m,mols->nr ,i,index[i],mols->index[m]);	
         }
+	if(backindex[m]==-1) backindex[m]=i;
         if (m == mols->nr)
         {
             gmx_fatal(FARGS, "index[%d]=%d does not correspond to the first atom of a molecule", i+1, index[i]+1);
@@ -2250,15 +2256,9 @@ void spol_atom2molindex(int *n, int *index, int*backindex, t_block *mols)
                 gmx_fatal(FARGS, "The index group is not a set of whole molecules");
             }
             index[i++]=m;
-          //  printf("inside: index[%d]=%d mols->index[%d]=%d\n",i-1,index[i-1],m,mols->index[m]);
+         //   printf("inside: index[%d]=%d mols->index[%d]=%d\n",i-1,index[i-1],m,mols->index[m]);
         }
     }
-    backindex[0]=0;
-    for(i=1;i<*n;i++){
-        if(index[i]!=index[i-1])
-           *(++backindex)=i;
-    }
-    *(++backindex) = *n;
 }
 
 
@@ -2582,13 +2582,21 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
 	}
         /* let's apply normalizations...*/
         if(itim->bMCnormalization){
-  	   for(i=0;i<itim->n_histo;i++){
-                if(i==RANDOM_PHASE) continue;
-  	 	for(j=0;j<histo->nbins;j++){
-                        double norm =  histo->rdata[RANDOM_PHASE*histo->nbins + j ];
-                        if(norm>0) histo->rdata[ i * histo->nbins + j ] /= norm ;
-                }
-             }
+    	   for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
+	      for(i=0;i<itim->maxlayers;i++){
+	         if(j==SUPPORT_PHASE && i==0) continue; 
+	         if(j!=SUPPORT_PHASE && i!=0) continue;
+	         for(int m=ATOMIC;m<=MOLECULAR;m++){
+		    if(j!=SUPPORT_PHASE && m==MOLECULAR) continue;
+	            int index = GET_HISTO_INDEX(INTRINSIC_DENSITY,j,i,m,__LINE__);
+	            int index_rnd = GET_HISTO_INDEX(INTRINSIC_DENSITY,RANDOM_PHASE,0,ATOMIC,__LINE__);
+  	            for(int k=0;k<histo->nbins;k++){
+                         double norm =  histo->rdata[index_rnd*histo->nbins + k ];
+                         if(norm>0) histo->rdata[ index * histo->nbins + k ] /= norm ;
+                    }
+                 }
+              }
+           }
         }
   
   	for(i=0;i<itim->n_histo;i++){
@@ -2746,9 +2754,6 @@ This is too cluttered. Reorganize the code...
     if(2*size<histo->minsize) histo->minsize=2*size;
     histo->iterations++;
     for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
-    printf("g: %d el: %d\n",j,itim->n[j]);
-    }
-    for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
 	int isizem, *indexm,*backindex;
 	int molecular_layer,atomic_layer;
 	isizem=itim->n[j];
@@ -2757,7 +2762,7 @@ This is too cluttered. Reorganize the code...
 
         if(j==RANDOM_PHASE && !itim->bMCnormalization) continue;
 
-	if(!(j==RANDOM_PHASE && !itim->bMCnormalization)) {
+	if(!(j==RANDOM_PHASE && itim->bMCnormalization)) {
 		for(i=0;i<itim->n[j];i++) indexm[i]=itim->gmx_index[j][i]; // NOTE: TODO check "additional"  under the PATCH case
                 spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
 	}
@@ -2782,6 +2787,7 @@ This is too cluttered. Reorganize the code...
 			}	
 			molecular_layer= ( minlayer==100000 ? 0 :minlayer) ;	
 			atomic_layer =itim->mask[i]; 
+			//printf("End of the story: molecular=%d, atomic=%d i=%d,i1=%d,i2=%d\n",molecular_layer,atomic_layer,i,i1,i2);
 		}
                 if(itim->com_opt[j]) {
                      if(j>=itim->ngmxphases){  exit(printf("Internal error\n")) ;} 
@@ -2895,7 +2901,7 @@ This is too cluttered. Reorganize the code...
 				sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,j,molecular_layer,MOLECULAR,__LINE__), p4[2], histo, itim,(real)(locmass));
 			}
 		 } else { 
-		 	sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,0,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
+		 	   sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,0,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
 		 }
 #endif
                  //printf("SAMPLING %d %d %f %d\n",i,sampled,locmass,check+=locmass);
