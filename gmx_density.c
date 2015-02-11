@@ -37,7 +37,7 @@
 NOTE: how to acess atom properties
         if you have the index of the phase :
            for(i=0;i<itim->n[phase];i++){
-                     atom_index = itim->gmx_index[phase][itim->phase_index[phase][i]];
+                     atom_index = itim->gmx_index[phase][i];
                      resindex   = top->atoms.atom[atom_index].resind;
                      resname    = *top->atoms.resinfo[top->atoms.atom[atom_index].resind].name
                      atomname   = *(top->atoms.atomname[atom_index]);
@@ -45,7 +45,7 @@ NOTE: how to acess atom properties
            }
         if you have the index of the alpha-shape:
 	   for(i=0;i<itim->nalphapoints;i++){
-		    phase_index =itim->phase_index[SUPPORT_PHASE][ itim->alpha_index[i]];
+		    phase_index =itim->alpha_index[i];
                     atom_index  =itim->gmx_index[SUPPORT_PHASE][phase_index];
                     ...
            }
@@ -528,89 +528,31 @@ int kd_insert3(struct kdtree *tree, real x, real y, real z, real *data)
 int kd_insert3p(struct kdtree *tree, real x, real y, real z, real *data, real cut)
 {
 	ITIM* itim = global_itim;
-	int i,j,ret;
+	int i,j,k,ret,count=0;
 	real buf[3],buf2[3];
 	buf[0]=x;
 	buf[1]=y;
 	buf[2]=z;
 	ret = kd_insert(tree, buf, data);
 	if(cut>0){
-	     for(i=0;i<3;i++){
-		buf2[0]=x;
-		buf2[1]=y;
-		buf2[2]=z;
-		if(buf[i]+cut > itim->box[i]/2.) {  // x y z  + 
-		   buf2[i]=buf[i]-itim->box[i];
-		   kd_insert(tree, buf2, data);
-
-   	           for(j=i+1;j<3;j++){  
-   	     		if(buf[j]+cut > itim->box[j]/2.) {  // xy xz yz  +
-   	     		   buf2[j]=buf[j]-itim->box[j];
-   	     		   kd_insert(tree, buf2, data);
-			   if(j+1<3){   
-   	     		     if(buf[j+1]+cut > itim->box[j+1]/2.) {  // xyz + 
-   	     		        buf2[j+1]=buf[j+1]-itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-   	     		     if(buf[j+1]-cut < -itim->box[j+1]/2.) {               // xyz -
-   	     		        buf2[j+1]=buf[j+1]+itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-			   }
-   	     		}
-   	     		if(buf[j]-cut < -itim->box[j]/2.) {          // xy xz yz  -
-   	     		   buf2[j]=buf[j]+itim->box[j];
-   	     		   kd_insert(tree, buf2, data);
-			   if(j+1<3){   
-   	     		     if(buf[j+1]+cut > itim->box[j+1]/2.) {  // xyz +
-   	     		        buf2[j+1]=buf[j+1]-itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-   	     		     if(buf[j+1]-cut < -itim->box[j+1]/2.) {               // xyz -
-   	     		        buf2[j+1]=buf[j+1]+itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-			   }
-   	     		}
-   	     	     }
-
-		}
-		if(buf[i]-cut <-itim->box[i]/2.) { 
-		   buf2[i]=buf[i]+itim->box[i];
-		   kd_insert(tree, buf2, data);
-
-   	           for(j=i+1;j<3;j++){  
-   	     		if(buf[j]+cut > itim->box[j]/2.) {  // xy xz yz  +
-   	     		   buf2[j]=buf[j]-itim->box[j];
-   	     		   kd_insert(tree, buf2, data);
-			   if(j+1<3){   
-   	     		     if(buf[j+1]+cut > itim->box[j+1]/2.) {  // xyz + 
-   	     		        buf2[j+1]=buf[j+1]-itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-   	     		     if(buf[j+1]-cut < -itim->box[j+1]/2.) {               // xyz -
-   	     		        buf2[j+1]=buf[j+1]+itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-			   }
-   	     		}
-   	     		if(buf[j]-cut < -itim->box[j]/2.) {          // xy xz yz  -
-   	     		   buf2[j]=buf[j]+itim->box[j];
-   	     		   kd_insert(tree, buf2, data);
-			   if(j+1<3){   
-   	     		     if(buf[j+1]+cut > itim->box[j+1]/2.) {  // xyz +
-   	     		        buf2[j+1]=buf[j+1]-itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-   	     		     if(buf[j+1]-cut < -itim->box[j+1]/2.) {               // xyz -
-   	     		        buf2[j+1]=buf[j+1]+itim->box[j+1];
-   	     		        kd_insert(tree, buf2, data);
-                             }
-			   }
-   	     		}
-   	     	     }
-		}
-	     }
+	     for(i=-1;i<2;i++){
+	       if( (i==-1 && buf[0]+cut > itim->box[0]/2.) || (i==1 && buf[0]-cut < -itim->box[0]/2.) || i==0 ){
+	         buf2[0]=buf[0]+i*itim->box[0];	
+	         for(j=-1;j<2;j++){
+	           if( (j==-1 && buf[1]+cut > itim->box[1]/2.) || (j==1 && buf[1]-cut < -itim->box[1]/2.) || j==0 ){
+	             buf2[1]=buf[1]+j*itim->box[1];	
+	             for(k=-1;k<2;k++){
+	                if( (k==-1 && buf[2]+cut > itim->box[2]/2.) || (k==1 && buf[2]-cut < -itim->box[2]/2.) || k==0 ){
+	                  buf2[2]=buf[2]+k*itim->box[2];	
+	                  if(k==0 && j==0 && i==0) continue;
+   	     		  ret = kd_insert(tree, buf2, data);
+			  count++;
+	                }
+	             }
+                   }
+                 }
+	       }
+             }
         }
 	return ret;
 }
@@ -1384,10 +1326,9 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 		vir[3*i]=vir[3*i+1]=vir[3*i+2]=0.0;
 	}
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
-	       phase_index= itim->phase_index[SUPPORT_PHASE][i];
-	       atom_index = itim->gmx_index[SUPPORT_PHASE][phase_index];
-	       if(itim->mask[phase_index]>0 && itim->mask[phase_index]< itim->maxlayers+1){
-		 layer = itim->mask[phase_index]-1;
+	       atom_index = itim->gmx_index[SUPPORT_PHASE][i];
+	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
+		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
 #ifdef VIRIAL_EXTENSION
                  f[3*layer]   += fr->f[atom_index][0];
@@ -1475,19 +1416,12 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 	partn++;
         /* find the lines within range from our particle position pos */
 	presults = kd_nearest_range( itim->mesh.tree, pos, sigma + itim->alpha); 
-         if(0) printf("gromacs id: %d \n",index+1);
         while( !kd_res_end( presults ) ) {
           /* get the data and position of the current result item */
           p =  (int*)kd_res_item(presults, res); /* they were init'd all to DIR_POSITIVE. Once we find a 
 	  					    touching gridline, we flip the value (see below). */
-         if(0) printf("gromacs id: %d  pos = %f %f %f dist = %f\n",index+1,res[0],res[1],res[2],sqrt((res[0]-pos[0])*(res[0]-pos[0])+
-                                                                                           (res[1]-pos[1])*(res[1]-pos[1])+
-                                                                                           (res[2]-pos[2])*(res[2]-pos[2]))
-);
-	  ccc++;
 	  if (*p==face) {
-		if(flag==0) { 
-			flag=1; // if already done, don't add this particle anymore.
+		if(itim->mask[index]==0) { // in  main cluster, layer not yet assigned
 			itim->mask[index]=itim->current_layer;
 
 			if(itim->current_layer==1) { 
@@ -1552,7 +1486,7 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
         }
 //	printf("SAW: face: %d testing particle %d, # of lines in range: %d. So far found %d matches\n",face,partn,ccc,counter);
 	kd_res_free( presults );
-	return 1;
+	return counter;
 }
 
 int check_itim_testlines_periodic(Direction face, int index, real * pos,real sigma, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0){
@@ -1565,29 +1499,37 @@ int check_itim_testlines_periodic(Direction face, int index, real * pos,real sig
 	border_negative[0]=-itim->box[0]/2. + sigma + itim->alpha ;
 	border_negative[1]=-itim->box[1]/2. + sigma + itim->alpha ;
 
-	ret *= check_itim_testlines(face,index, pos,sigma,itim,0,gmx_index_phase,top, x0);
-	if(pos[0] < border_negative[0] || pos[0] > border_positive[0] ){
-		if(pos[0]< border_negative[0]){
+	ret = check_itim_testlines(face,index, pos,sigma,itim,0,gmx_index_phase,top, x0);
+	if(ret==0) return 0;
+
+	if(pos[0] <= border_negative[0] || pos[0] >= border_positive[0] ){
+		if(pos[0]<= border_negative[0]){
 			periodic[0]=pos[0]+itim->box[0];
 		} else { 
 			periodic[0]=pos[0]-itim->box[0];
 		}
 		periodic[1]=pos[1];
-		ret *= check_itim_testlines(face,index,periodic,sigma,itim,0,gmx_index_phase,top,x0);
+		ret = check_itim_testlines(face,index,periodic,sigma,itim,0,gmx_index_phase,top,x0);
+		if(ret==0) return 0;
 	}
-	if(pos[1] < border_negative[1] || pos[1] > border_positive[1] ) { 
-		if(pos[1]< border_negative[1]){
+	if(pos[1] <= border_negative[1] || pos[1] >= border_positive[1] ) { 
+		if(pos[1]<= border_negative[1]){
 			periodic[1]=pos[1]+itim->box[1];
 		} else { 
 			periodic[1]=pos[1]-itim->box[1];
 		}
 		periodic[0]=pos[0];
-		ret *= check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
-		if(pos[0]< border_negative[0])
-			periodic[0]=pos[0]+itim->box[0];
-		if(pos[0]> border_positive[0])
-			periodic[0]=pos[0]-itim->box[0];
-		ret *= check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
+		ret = check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
+		if(pos[0] <= border_negative[0] || pos[0] >= border_positive[0] ){
+			if(pos[0]<= border_negative[0]){
+				periodic[0]=pos[0]+itim->box[0];
+			}
+			else { 
+				periodic[0]=pos[0]-itim->box[0];
+			}
+			ret = check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
+			if(ret==0) return 0;
+		}
         }
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); // this just resets the flag within check_itim_testlines.
 	return ret;
@@ -1712,8 +1654,9 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
         i=0;
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
-		result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
-//printf("positive: %d %d [%d]\n",itim->gmx_index[SUPPORT_PHASE][index],i,mask[index]);fflush(stdout);
+		if(itim->mask[index]==0){
+			result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
+		}
           	i++ ; 
 		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE])); }
 	} while (result) ;
@@ -1724,8 +1667,9 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
 	qsort((void*)itim->phase_index[SUPPORT_PHASE], itim->n[SUPPORT_PHASE], sizeof(int) , projection_negative);
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
-		result = check_itim_testlines_periodic(DIR_NEGATIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
-//printf("negative: %d %d [%d]\n",i,index,mask[index]);fflush(stdout);
+		if(itim->mask[index]==0){
+			result = check_itim_testlines_periodic(DIR_NEGATIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
+		}
           	i++; 
 		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the negative side...\n",itim->n[SUPPORT_PHASE])); }
 	} while (result) ;
@@ -1804,8 +1748,7 @@ void dump_phase_points(PHASE phase, t_topology *top, FILE* cid){
         fprintf(cid,"%s\n",*(top->name));
         fprintf(cid,"%d\n",itim->n[phase]);
  	for(i=0;i<itim->n[phase];i++){
-                atom_index=itim->gmx_index[phase][itim->phase_index[phase][i]];
-		//mask = itim->mask[ i + itim->inclusive_map[2*phase]];	
+                atom_index=itim->gmx_index[phase][i];
                 fprintf(cid,"%5i%5s%5s%5i%8.3f%8.3f%8.3f%8.4f%8.4f%8.4f\n",
                             top->atoms.atom[atom_index].resind+1,
                             *(top->atoms.resinfo[top->atoms.atom[atom_index].resind].name),
@@ -1819,53 +1762,190 @@ void dump_phase_points(PHASE phase, t_topology *top, FILE* cid){
         fprintf(cid,"%f %f %f\n",itim->box[0],itim->box[1],itim->box[2]);
 }
 
-void dump_slabs(t_topology* top){
-	int i,atom_index=0, phase_index;
-	char fname[1024];
-	FILE ** fp;
-	int  *size;
-        ITIM * itim=global_itim; 
+void spol_atom2molindex(int *n, int *index, int*backindex, t_block *mols)
+{
+    int nmol, i, j, m;
 
-	fp = (FILE**)malloc(itim->maxlayers*sizeof(FILE*));
-	size = (int*)malloc(itim->maxlayers*sizeof(int));
-	for(i=0;i<itim->maxlayers;i++) size[i]=0;
+    nmol = 0;
+    i    = 0;
+    m=0;
+    while (m < mols->nr) {
+	backindex[m]=-1;
+	m++;
+    }
 
- 	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
-	       phase_index= itim->phase_index[SUPPORT_PHASE][i];
-	       atom_index = itim->gmx_index[SUPPORT_PHASE][phase_index];
-	       if(itim->mask[phase_index]>0 && itim->mask[phase_index]< itim->maxlayers+1){
-			size[itim->mask[phase_index]-1]++;	
-	       }
-        }
-
-	for(i = 0 ; i < itim->maxlayers ; i++ ){
-		sprintf(fname,"layer.%d.gro",i+1);
-		fp[i]=fopen(fname,"a");
-        	fprintf(fp[i],"%s\n",*(top->name));
-        	fprintf(fp[i],"%d\n",size[i]); // TODO: put the right number here
+    m = 0;
+    for (i =0 ; i < *n ; i++) { 
+        while (m < mols->nr &&  ! ( mols->index[m] <= index[i]  && index[i] < mols->index[m+1] ) )  { 
+		m++;
 	}
-		
+        if (m == mols->nr)
+        {
+            gmx_fatal(FARGS, "index[%d]=%d does not correspond to the first atom of a molecule", i+1, index[i]+1);
+        }
+	if(backindex[m]==-1) backindex[m]=i;
+        index[i]=m;	
+    }
+}
+
+void compute_normal(rvec p1,rvec p2,rvec p3,real * normal,GEOMETRY geometry){
+            rvec v1,v2,vn;
+            rvec_sub(p2,p1,v1);                                  
+            rvec_sub(p3,p1,v2);                                  
+            cprod(v1,v2,vn);
+            unitv(vn,vn);
+            /* SAW: here we are assuming that we are using the -center option,
+                    which should anyway always on for the planar case and spherical cases... Fix this. */
+            if (geometry==SURFACE_PLANE)
+                 if( vn[2]*p1[2]<0 ) vn[2]*=-1;
+            normal[0]=vn[0]; normal[1]=vn[1]; normal[2]=vn[2];
+}
+
+real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITIM * itim, int i, int phase) {
+		real p1[3],p2[3],p3[3],diff[3];
+                rvec v1,v2,vn;
+		real a1,a2,a3,atot,dist;
+                struct kdres * presults;
+		int j=0,found=0;
+		real * zpos;	
+
+		/* p1 */
+		presults = kd_nearest_range( Surface, P,0.6+global_itim->alpha); 
+		zpos    = (real*) kd_res_item(presults, p1); 
+		if(kd_res_end(presults)) exit(printf("Error, no projected surface point found\n"));
+		p1[2]=*zpos;
+		while(p1[2]*P[2]<0){ /*i.e. they are on opposite sides, this can happen only with ITIM*/
+			kd_res_next( presults );
+			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 1e6 ; }
+			zpos    = (real*) kd_res_item(presults, p1); 
+			p1[2]=*zpos;
+		}
+
+                rvec_sub(p1,P,diff); if(norm2(diff)<1e-6) { kd_res_free(presults); return 0.0 ;  } 
+
+                do {
+			kd_res_next( presults );
+			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 1e6 ; }
+                	kd_res_item(presults, p2); 
+
+			zpos    = (real*) kd_res_item(presults, p2); 
+			p2[2]=*zpos;
+
+		} while(p2[2]*P[2]<0);
+
+                rvec_sub(p2,P,diff); if(norm2(diff)<1e-6) { kd_res_free(presults); return 0.0 ;  } 
+
+		/*Now start iterating over all other (sorted) surface atoms p3, to find a 
+		  triangle which p1-p2-p3 encloses our point P, i.e. s.t. a(123)=a(124)+a(234)+a(134)*/
+		a1=fabs(triangle_area(p1,p2,P,itim->box));
+		while (kd_res_next( presults )) {  
+		    zpos    = (real*) kd_res_item(presults, p3); 
+	            p3[2]=*zpos;
+
+		    if(p3[2]*P[2]<0) continue; /* they are not on the same side */
+		    /* triangle_area returns the area of the triangle, projected on the xy plane */
+		    atot=fabs(triangle_area(p1,p2,p3,itim->box));
+		    a2=fabs(triangle_area(p1,p3,P,itim->box));
+		    a3=fabs(triangle_area(p2,p3,P,itim->box));
+		    if(fabs(a1+a2+a3 - atot) < 1e-6 ){
+
+				dist = interpolate_distance(p1,p2,p3,P); /* this is not really a distance, as it is signed, 
+									     but we carry the sign to have the complete information, 
+                                                                             as particles located behind the surface might exist */
+				dist = P[2]-dist; 
+				if(P[2]<0.) dist = -dist ; /* the other side...*/
+
+		     		compute_normal(p1,p2,p3,normal,itim->geometry);
+                                kd_res_free(presults);
+				return  dist;
+			} 
+                }
+			
+                /* no suitable triangle found */
+                normal[0]=normal[1]=normal[2]=NORMAL_UNDEFINED;
+	        dist = P[2] -p1[2];
+		if(P[2]<0.) dist = -dist ; /* the other side...*/
+
+                kd_res_free(presults);
+		return dist;
+}
+
+void dump_slabs(t_topology* top, int dump_mol){
+	int i,atom_index=0, phase_index, layer;
+	static FILE * fp[2]={NULL,NULL};
+        ITIM * itim=global_itim; 
+	int isizem, *indexm,*backindex;
+	char fname[2048];
+	if(dump_mol!=0 && dump_mol!=1) exit(printf("Internal error, dump_mol != 1 || 0 \n"));
+	sprintf(fname,"layers.pdb");
+	if(dump_mol)sprintf(fname,"layers_mol.pdb");
+
+	if(fp[dump_mol]==NULL){ 
+		fp[dump_mol] = fopen(fname,"w"); 
+	} else { 
+		fclose(fp[dump_mol]);
+		fp[dump_mol] = fopen(fname,"a"); 
+	} 
+	fprintf(fp[dump_mol],"CRYST1%9.3f%9.3f%9.3f%7.2f%7.2f%7.2f%10s%3d\n",
+			  itim->box[0]*10.,itim->box[1]*10.,itim->box[2]*10.,
+			   90.,90.,90.,"P  1 ",1);
+
+	if(dump_mol) { 
+		isizem=itim->n[SUPPORT_PHASE];
+		snew(indexm,isizem);
+		snew(backindex,top->mols.nr+1);
+		for(i=0;i<itim->n[SUPPORT_PHASE];i++) indexm[i]=itim->gmx_index[SUPPORT_PHASE][i]; // NOTE: TODO check "additional"  under the PATCH case
+                spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
+        }
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
-	       phase_index= itim->phase_index[SUPPORT_PHASE][i];
-	       atom_index = itim->gmx_index[SUPPORT_PHASE][phase_index];
-	       if(itim->mask[phase_index]>0 && itim->mask[phase_index]< itim->maxlayers+1){
-                 fprintf(fp[itim->mask[phase_index]-1],"%5i%5s%5s%5i%8.3f%8.3f%8.3f%8.4f%8.4f%8.4f\n",
-                           top->atoms.atom[atom_index].resind+1,
-                           *(top->atoms.resinfo[top->atoms.atom[atom_index].resind].name),
-                           *(top->atoms.atomname[atom_index]),
-	       	           atom_index+1,
-	       	           itim->phase[SUPPORT_PHASE][3*phase_index],
-	       	           itim->phase[SUPPORT_PHASE][3*phase_index+1],
-	       	           itim->phase[SUPPORT_PHASE][3*phase_index+2],
-                           0.0,0.0,0.0);
-               }
+	       		
+	        int mol,i1,i2;
+	        phase_index= i ; 
+		real normal[3];
+	        atom_index = itim->gmx_index[SUPPORT_PHASE][phase_index];
+
+	        
+		real dist = perform_interpolation(Surface, &(itim->phase[SUPPORT_PHASE][3*i]), &(normal[0]),itim,i,SUPPORT_PHASE);
+	        if (dump_mol){
+			int minlayer = 100000;
+			int k;
+	        	mol  = indexm[i];
+	        	i1 = backindex[mol] ;
+	        	i2 = backindex[mol+1];
+			for(k=i1;k<i2;k++){
+				if (itim->mask[k] >0 && itim->mask[k] < minlayer ) { 
+					minlayer = itim->mask[k];
+				}
+			}	
+			layer= ( minlayer==100000 ? 0 :minlayer) ;	
+		//	printf("mol %d -> %d %d %d %d\n",mol,i1,i2,layer,itim->mask[i]);
+		} else {
+			layer = itim->mask[i];
+ 		}
+	        if(layer>0 && layer< itim->maxlayers+1){
+                  fprintf(fp[dump_mol],"%-6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f          %2s%2s\n",
+	         	   "ATOM",
+	         	   atom_index,
+                            *(top->atoms.atomname[atom_index]),
+	         	   " ",
+                            *(top->atoms.resinfo[top->atoms.atom[atom_index].resind].name),
+	         	   " ",
+	         	   top->atoms.atom[atom_index].resind+1,
+	         	   " ",
+	        	   10*itim->phase[SUPPORT_PHASE][3*i],
+	        	   10*itim->phase[SUPPORT_PHASE][3*i+1],
+	        	   10*itim->phase[SUPPORT_PHASE][3*i+2],
+			   (double)layer,
+                            10.*dist,
+	         	   " ",
+	         	   itim->phase[SUPPORT_PHASE][3*i+2]>0?"1":"2");
+                }
         }
-	for(i = 0 ; i < itim->maxlayers ; i++ ){
-        	fprintf(fp[i],"%f %f %f\n",itim->box[0],itim->box[1],itim->box[2]);
-		fclose(fp[i]);
+
+	if(dump_mol) { 
+		free(indexm);
+		free(backindex);
         }
-	free(fp);
-	free(size);
 }
 
 void dump_surface_points(t_topology* top,FILE* cid){
@@ -2125,31 +2205,7 @@ void generate_mask_ns(int bCluster, rvec * gmx_coords, int ** mask, int *nindex,
 	}
 }
 
-void spol_atom2molindex(int *n, int *index, int*backindex, t_block *mols)
-{
-    int nmol, i, j, m;
 
-    nmol = 0;
-    i    = 0;
-    m=0;
-    while (m < mols->nr) {
-	backindex[m]=-1;
-	m++;
-    }
-
-    m = 0;
-    for (i =0 ; i < *n ; i++) { 
-        while (m < mols->nr &&  ! ( mols->index[m] <= index[i]  && index[i] < mols->index[m+1] ) )  { 
-		m++;
-	}
-        if (m == mols->nr)
-        {
-            gmx_fatal(FARGS, "index[%d]=%d does not correspond to the first atom of a molecule", i+1, index[i]+1);
-        }
-	if(backindex[m]==-1) backindex[m]=i;
-        index[i]=m;	
-    }
-}
 
 
 
@@ -2329,87 +2385,9 @@ static int populate_histogram(int index, real dist, Histogram * histo, ITIM * it
 	    return 0;
 }
 
-void compute_normal(rvec p1,rvec p2,rvec p3,real * normal,GEOMETRY geometry){
-            rvec v1,v2,vn;
-            rvec_sub(p2,p1,v1);                                  
-            rvec_sub(p3,p1,v2);                                  
-            cprod(v1,v2,vn);
-            unitv(vn,vn);
-            /* SAW: here we are assuming that we are using the -center option,
-                    which should anyway always on for the planar case and spherical cases... Fix this. */
-            if (geometry==SURFACE_PLANE)
-                 if( vn[2]*p1[2]<0 ) vn[2]*=-1;
-            normal[0]=vn[0]; normal[1]=vn[1]; normal[2]=vn[2];
-}
 
-real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITIM * itim, int i, int phase) {
-		real p1[3],p2[3],p3[3],diff[3];
-                rvec v1,v2,vn;
-		real a1,a2,a3,atot,dist;
-                struct kdres * presults;
-		int j=0,found=0;
-		real * zpos;	
 
-		/* p1 */
-		presults = kd_nearest_range( Surface, P,0.6+global_itim->alpha); 
-		zpos    = (real*) kd_res_item(presults, p1); 
-		if(kd_res_end(presults)) exit(printf("Error, no projected surface point found\n"));
-		p1[2]=*zpos;
-		while(p1[2]*P[2]<0){ /*i.e. they are on opposite sides, this can happen only with ITIM*/
-			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 1e6 ; }
-			zpos    = (real*) kd_res_item(presults, p1); 
-			p1[2]=*zpos;
-		}
 
-                rvec_sub(p1,P,diff); if(norm2(diff)<1e-6) { kd_res_free(presults); return 0.0 ;  } 
-
-                do {
-			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 1e6 ; }
-                	kd_res_item(presults, p2); 
-
-			zpos    = (real*) kd_res_item(presults, p2); 
-			p2[2]=*zpos;
-
-		} while(p2[2]*P[2]<0);
-
-                rvec_sub(p2,P,diff); if(norm2(diff)<1e-6) { kd_res_free(presults); return 0.0 ;  } 
-
-		/*Now start iterating over all other (sorted) surface atoms p3, to find a 
-		  triangle which p1-p2-p3 encloses our point P, i.e. s.t. a(123)=a(124)+a(234)+a(134)*/
-		a1=fabs(triangle_area(p1,p2,P,itim->box));
-		while (kd_res_next( presults )) {  
-		    zpos    = (real*) kd_res_item(presults, p3); 
-	            p3[2]=*zpos;
-
-		    if(p3[2]*P[2]<0) continue; /* they are not on the same side */
-		    /* triangle_area returns the area of the triangle, projected on the xy plane */
-		    atot=fabs(triangle_area(p1,p2,p3,itim->box));
-		    a2=fabs(triangle_area(p1,p3,P,itim->box));
-		    a3=fabs(triangle_area(p2,p3,P,itim->box));
-		    if(fabs(a1+a2+a3 - atot) < 1e-6 ){
-
-				dist = interpolate_distance(p1,p2,p3,P); /* this is not really a distance, as it is signed, 
-									     but we carry the sign to have the complete information, 
-                                                                             as particles located behind the surface might exist */
-				dist = P[2]-dist; 
-				if(P[2]<0.) dist = -dist ; /* the other side...*/
-
-		     		compute_normal(p1,p2,p3,normal,itim->geometry);
-                                kd_res_free(presults);
-				return  dist;
-			} 
-                }
-			
-                /* no suitable triangle found */
-                normal[0]=normal[1]=normal[2]=NORMAL_UNDEFINED;
-	        dist = P[2] -p1[2];
-		if(P[2]<0.) dist = -dist ; /* the other side...*/
-
-                kd_res_free(presults);
-		return dist;
-}
 
 ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int bOrder, int bInclusive, int dump_mol, int bMCnormalization , const char ** geometry, int ngrps_add){
 	    ITIM * itim;
@@ -2687,16 +2665,15 @@ This is too cluttered. Reorganize the code...
 			int i2 = backindex[mol+1];
 			int minlayer=100000;
 			int k;
-			//printf("checking boundaries of mol %d (atom %d) = %d %d\n",mol,i,i1,i2);
+//			printf("checking boundaries of mol %d (atom %d) = %d %d\n",mol,i,i1,i2);
 			for(k=i1;k<i2;k++){
-			//	printf("\t mask[%d]=%d\n",k,itim->mask[k]);
+	//			printf("\t mask[%d]=%d\n",k,itim->mask[k]);
 				if (itim->mask[k] >0 && itim->mask[k] < minlayer ) { 
 					minlayer = itim->mask[k];
 				}
 			}	
 			molecular_layer= ( minlayer==100000 ? 0 :minlayer) ;	
 			atomic_layer =itim->mask[i]; 
-			//printf("End of the story: molecular=%d, atomic=%d i=%d,i1=%d,i2=%d\n",molecular_layer,atomic_layer,i,i1,i2);
 		}
                 if(itim->com_opt[j]) {
                      if(j>=itim->ngmxphases){  exit(printf("Internal error\n")) ;} 
@@ -2956,7 +2933,7 @@ void remove_phase_pbc(int ePBC, t_atoms *atoms, matrix box, rvec x0[], int axis,
 
          }
          for(rho_max=rho[0],i=1; i<5;i++) if (rho[i]>rho_max) rho_max=rho[i];
-         if(rho[0] > rho_max/4 || rho[4] > rho_max/4) { /* careful: not >= otherwise the algorithm doesn't work when rho=0 
+         if(rho[0] > rho_max/2 || rho[4] > rho_max/2) { /* careful: not >= otherwise the algorithm doesn't work when rho=0 
             					       in all sampled regions */
             	shift+=bWidth*rand()/RAND_MAX;
 		fprintf(stderr,"Trying to shift the box by %f nm\n",shift);
@@ -3343,10 +3320,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
     	t_trxframe     fr;
         t_trxstatus * status ;	
   	gmx_rmpbc_t  gpbc=NULL;
-        surf_cid=fopen("surf.gro","w"); // TODO: from command line, or at least switchable!
-        surfmol_cid=fopen("surfmol.gro","w"); 
-        phase_cid=fopen("phase.gro","w");
-        phase2_cid=fopen("phase2.gro","w");
+
 	radii = load_radii(top);
 //        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
 //          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
@@ -3356,8 +3330,28 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
 
         itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add); 
+
+	if(bDump)
+        	surf_cid=fopen("surf.gro","w"); // TODO: from command line, or at least switchable!
+	if(itim->dump_mol)
+            surfmol_cid=fopen("surfmol.gro","w"); 
+	if(bDumpPhases){
+        	phase_cid=fopen("phase.gro","w");
+        	phase2_cid=fopen("phase2.gro","w");
+	}
+
+
                /* TODO: decide if the density of test lines (0.04) should be hardcoded or not.*/
 	FILE * statfile = fopen("stats.dat","w");
+	for(int i = 0 ; i < itim->maxlayers ; i++ ){
+		fprintf(statfile, "# surface_density");
+#ifdef VIRIAL_EXTENSION
+		fprintf(statfile,"f_x f_y f_z ");
+		fprintf(statfile, "pres_x pres_y pres_z ");
+#endif
+	}
+	fprintf(statfile, "# \n");
+
 	fclose(statfile);
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
@@ -3391,11 +3385,13 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	            itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); // gh
                 }
 		if(bDump){
-	   	    dump_slabs(top); 
-	   	    itim->dump_surface_points(top,surf_cid); 
-                    if(itim->dump_mol)
-	   	       itim->dump_surface_molecules(top,surfmol_cid,index); 
+	   	    dump_slabs(top,0); 
+	   	    //itim->dump_surface_points(top,surf_cid); 
+                    //if(itim->dump_mol)
+	   	       //itim->dump_surface_molecules(top,surfmol_cid,index); 
 		}
+                if(itim->dump_mol)  
+			dump_slabs(top,1);
 		/* Compute the intrinsic profile */
 	        if(dens_opt!='s') {  
 		   compute_layer_profile(box, index, top, dens_opt, & fr ); 
