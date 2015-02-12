@@ -1872,13 +1872,15 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
 void dump_slabs(t_topology* top, int dump_mol){
 	int i,atom_index=0, phase_index, layer;
+	static int frame[2]={0,0};
 	static FILE * fp[2]={NULL,NULL};
         ITIM * itim=global_itim; 
 	int isizem, *indexm,*backindex;
 	char fname[2048];
 	if(dump_mol!=0 && dump_mol!=1) exit(printf("Internal error, dump_mol != 1 || 0 \n"));
-	sprintf(fname,"layers.pdb");
-	if(dump_mol)sprintf(fname,"layers_mol.pdb");
+	sprintf(fname,"layers.%06d.pdb",frame[dump_mol]);
+	if(dump_mol)sprintf(fname,"layers_mol.%06d.pdb",frame[dump_mol]);
+	frame[dump_mol]++;
 
 	if(fp[dump_mol]==NULL){ 
 		fp[dump_mol] = fopen(fname,"w"); 
@@ -1922,7 +1924,7 @@ void dump_slabs(t_topology* top, int dump_mol){
 		} else {
 			layer = itim->mask[i];
  		}
-	        if(layer>0 && layer< itim->maxlayers+1){
+	        if(layer< itim->maxlayers+1){
                   fprintf(fp[dump_mol],"%-6s%5d %4s%1s%3s %1s%4d%1s   %8.3f%8.3f%8.3f%6.2f%6.2f          %2s%2s\n",
 	         	   "ATOM",
 	         	   atom_index,
@@ -1941,6 +1943,7 @@ void dump_slabs(t_topology* top, int dump_mol){
 	         	   itim->phase[SUPPORT_PHASE][3*i+2]>0?"1":"2");
                 }
         }
+        fprintf(fp[dump_mol],"END\n");
 
 	if(dump_mol) { 
 		free(indexm);
