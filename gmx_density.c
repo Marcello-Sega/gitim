@@ -1177,7 +1177,6 @@ int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int lin
           	}
           }
         }
-
         for(n=SUPPORT_PHASE+1;n<itim->nphases;n++){ // one (intrinsic) histogram for each of the other phases
             	if(molecular == ATOMIC && phase==n && TYPE==INTRINSIC_DENSITY) return index;
             	index++;
@@ -2493,12 +2492,12 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
         if(itim->bMCnormalization){
     	   for(j=SUPPORT_PHASE ; j<itim->nphases+itim->nadd_index;j++){
 	      if (j==itim->RANDOM_PHASE) continue;
-	      for(i=0;i<itim->maxlayers;i++){
+	      for(i=1;i<itim->maxlayers+1;i++){
 	         if(j==SUPPORT_PHASE && i==0) continue; 
 	         if(j!=SUPPORT_PHASE && i!=0) continue;
 	         for(int m=ATOMIC;m<=MOLECULAR;m++){
 		    if(j!=SUPPORT_PHASE && m==MOLECULAR) continue;
-	            int index = GET_HISTO_INDEX(INTRINSIC_DENSITY,j,i,m,__LINE__);
+	            int index     = GET_HISTO_INDEX(INTRINSIC_DENSITY,j,                 i,m     ,__LINE__);
 	            int index_rnd = GET_HISTO_INDEX(INTRINSIC_DENSITY,itim->RANDOM_PHASE,0,ATOMIC,__LINE__);
   	            for(int k=0;k<histo->nbins;k++){
                          double norm =  histo->rdata[index_rnd*histo->nbins + k ];
