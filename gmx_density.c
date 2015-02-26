@@ -1246,8 +1246,8 @@ void clear_histo(Histogram * histo,int N){
 	for(i=0;i<histo->nbins;i++) histo->rdata[N*histo->nbins+i]=0;
 }
 void eprintv(real *v, char * s){
-	fprintf(stderr,"%f %f %f",v[0],v[1],v[2]);
-	fprintf(stderr,"%s",s);
+	fprintf(stdout,"%f %f %f",v[0],v[1],v[2]);
+	fprintf(stdout,"%s",s);
 }
 void printv(real *v, char * s){
 	printf("%f %f %f",v[0],v[1],v[2]);
@@ -1628,7 +1628,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
 	qsort((void*)itim->phase_index[SUPPORT_PHASE], itim->n[SUPPORT_PHASE], sizeof(int) , projection_positive);
 #ifdef TIME_PROFILE
         gettimeofday(&tp2, NULL);
-        fprintf(stderr,"Time to quicksort for itim: millisec=%f\n",1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
+        fprintf(stdout,"Time to quicksort for itim: millisec=%f\n",1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
 #endif
         /* The positive side */
         i=0;
@@ -1796,7 +1796,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 		p1[2]=*zpos;
 		while(p1[2]*P[2]<0){ /*i.e. they are on opposite sides, this can happen only with ITIM*/
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){  fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
 			zpos    = (real*) kd_res_item(presults, p1); 
 			p1[2]=*zpos;
 		}
@@ -1805,7 +1805,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
                 do {
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){  fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
                 	kd_res_item(presults, p2); 
 
 			zpos    = (real*) kd_res_item(presults, p2); 
@@ -2540,10 +2540,10 @@ void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_
 	}
 #ifdef TIME_PROFILE
         gettimeofday(&tp2, NULL);
-        fprintf(stderr,"Time to build surface (method: %s): millisec=%f\n",itim->method_name[itim->method],1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
+        fprintf(stdout,"Time to build surface (method: %s): millisec=%f\n",itim->method_name[itim->method],1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
 #endif
         arrange_alpha_points (itim,(int**)gmx_index_phase,top,gmx_coords); 
-	if(itim->info)fprintf(stderr,"Number of surface elements = %d\n",itim->nalphapoints);
+	if(itim->info)fprintf(stdout,"Number of surface elements = %d\n",itim->nalphapoints);
 }
 
 void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt, t_trxframe * fr){  
@@ -2834,7 +2834,7 @@ This is too cluttered. Reorganize the code...
     }
 #ifdef TIME_PROFILE
     gettimeofday(&tp2, NULL);
-    fprintf(stderr,"Time to make the histogram(s) for %d phases: millisec=%f\n",itim->nphases,1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
+    fprintf(stdout,"Time to make the histogram(s) for %d phases: millisec=%f\n",itim->nphases,1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
 #endif
 }
 
@@ -2908,7 +2908,7 @@ int get_electrons(t_electron **eltab, const char *fn)
   gmx_ffclose(in);
   
   /* sort the list */
-  fprintf(stderr,"Sorting list..\n");
+  fprintf(stdout,"Sorting list..\n");
   qsort ((void*)*eltab, nr, sizeof(t_electron), 
 	 (int(*)(const void*, const void*))compare);
 
@@ -2945,7 +2945,7 @@ void remove_phase_pbc(int ePBC, t_atoms *atoms, matrix box, rvec x0[], int axis,
          if(rho[0] > rho_max/2 || rho[4] > rho_max/2) { /* careful: not >= otherwise the algorithm doesn't work when rho=0 
             					       in all sampled regions */
             	shift+=bWidth*rand()/RAND_MAX;
-		fprintf(stderr,"Trying to shift the box by %f nm\n",shift);
+		fprintf(stdout,"Trying to shift the box by %f nm\n",shift);
 		if(shift>box[axis][axis]) exit(printf("Error: it was not possible to center the phase in the box\n"));
          } else return ;
     }
@@ -3037,7 +3037,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
   
   if (! *nslices)
     *nslices = (int)(box[axis][axis] * 10); /* default value */
-  fprintf(stderr,"\nDividing the box in %d slices\n",*nslices);
+  fprintf(stdout,"\nDividing the box in %d slices\n",*nslices);
 
   snew(*slDensity, nr_grps);
   for (i = 0; i < nr_grps; i++)
@@ -3071,7 +3071,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
 		    (int(*)(const void*, const void*))compare);
 
 	  if (found == NULL)
-	    fprintf(stderr,"Couldn't find %s. Add it to the .dat file\n",
+	    fprintf(stdout,"Couldn't find %s. Add it to the .dat file\n",
 		    *(top->atoms.atomname[index[n][i]]));
 	  else  
 	    (*slDensity)[n][slice] += found->nr_el - 
@@ -3090,7 +3090,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
    over all frames. Now divide by nr_frames and volume of slice 
 */
 
-  fprintf(stderr,"\nRead %d frames from trajectory. Counting electrons\n",
+  fprintf(stdout,"\nRead %d frames from trajectory. Counting electrons\n",
 	  nr_frames);
 
   for (n =0; n < nr_grps; n++) {
@@ -3141,7 +3141,7 @@ void calc_density(const char *fn, atom_id **index, int gnx[],
   
   if (! *nslices) {
     *nslices = (int)(box[axis][axis] * 10); /* default value */
-    fprintf(stderr,"\nDividing the box in %d slices\n",*nslices);
+    fprintf(stdout,"\nDividing the box in %d slices\n",*nslices);
   }
   
   snew(*slDensity, nr_grps);
@@ -3184,7 +3184,7 @@ void calc_density(const char *fn, atom_id **index, int gnx[],
      frames. Now divide by nr_frames and volume of slice 
      */
   
-  fprintf(stderr,"\nRead %d frames from trajectory. Calculating density\n",
+  fprintf(stdout,"\nRead %d frames from trajectory. Calculating density\n",
 	  nr_frames);
 
   for (n =0; n < nr_grps; n++) {
@@ -3293,7 +3293,7 @@ real * load_radii( t_topology *top ) {
             	sig6 = c12/c6;
             	vdw  = pow(sig6,1.0/6.0);
         	}
-            radii[i] = 0.5 * vdw;  /* SAW !!! */
+            radii[i] = 0.5 * vdw;
        }
        return radii;
 }
@@ -3534,7 +3534,7 @@ int gmx_density(int argc,char *argv[])
     { efDAT, "-ei", "electrons", ffOPTRD }, /* file with nr. of electrons */
     { efXVG,"-o","density",ffWRITE }, 	    
   };
-  
+
 geometry[0]=geometry[1];
 #define NFILE asize(fnm)
 if(0){
@@ -3565,7 +3565,7 @@ exit(0);
                     &oenv);
 
   if (bSymmetrize && !bCenter) {
-    fprintf(stderr,"Can not symmetrize without centering. Turning on -center\n");
+    fprintf(stdout,"Can not symmetrize without centering. Turning on -center\n");
     bCenter = TRUE;
   }
   /* Calculate axis */
@@ -3617,6 +3617,7 @@ exit(0);
     scanf("%f",&tmpcut);
     CLUSTERCUT[i] = tmpcut;
   } 
+  printf("\n");
 
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
@@ -3626,7 +3627,7 @@ exit(0);
   } else { 	
     if (dens_opt[0][0] == 'e') {
       nr_electrons =  get_electrons(&el_tab,ftp2fn(efDAT,NFILE,fnm));
-      fprintf(stderr,"Read %d atomtypes from datafile\n", nr_electrons);
+      fprintf(stdout,"Read %d atomtypes from datafile\n", nr_electrons);
   
       calc_electron_density(ftp2fn(efTRX,NFILE,fnm),index, ngx, &density, 
   			  &nslices, top, ePBC, axis, ngrps, &slWidth, el_tab, 
