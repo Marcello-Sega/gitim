@@ -1398,6 +1398,20 @@ void dump_itim_grid(ITIM * itim){
 	kd_res_free( presults );
 }
 
+int is_in_correct_phase(int index){
+	ITIM * itim=global_itim;
+	int test=0;
+	if(itim->bInclusive) {
+			if( index>=itim->inclusive_map[2*INNER_PHASE] && index<=itim->inclusive_map[2*INNER_PHASE+1]) {
+				 if( itim->mask[index]==0) {  test=1; }
+			} else { 
+				 if( itim->mask[index]==-1) {  test=1; }
+			}
+		
+	} else { test = (itim->mask[index]==0) ; } 
+	return test;
+}
+
 int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM *itim,int reset_flag,int ** gmx_index_phase, t_topology * top, rvec * x0){
 	int * p;          
 	int ccc=0;
@@ -1416,11 +1430,13 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
         /* find the lines within range from our particle position pos */
 	presults = kd_nearest_range( itim->mesh.tree, pos, sigma + itim->alpha); 
         while( !kd_res_end( presults ) ) {
+	  int test=0;
           /* get the data and position of the current result item */
           p =  (int*)kd_res_item(presults, res); /* they were init'd all to DIR_POSITIVE. Once we find a 
 	  					    touching gridline, we flip the value (see below). */
 	  if (*p==face) {
-		if(itim->mask[index]==0) { // in  main cluster, layer not yet assigned
+		if (is_in_correct_phase(index)) { // in  main cluster, layer not yet assigned
+		
 			itim->mask[index]=itim->current_layer;
 
 			if(itim->current_layer==1) { 
@@ -1542,29 +1558,12 @@ int projection_positive(const void * a, const void * b) {
 	j = *(int*)b;	
 	a2 = itim->phase[SUPPORT_PHASE][3*i+2] + itim->radii[i] ;
 	b2 = itim->phase[SUPPORT_PHASE][3*j+2] + itim->radii[j] ;
-	if(itim->bInclusive){
-	   int size[3];
-	   size[0]=itim->n[SUPPORT_PHASE];
-	   size[1]=itim->n[SUPPORT_PHASE+1];
-	   size[2]=itim->n[SUPPORT_PHASE+2];
 	   // here we use groups 1 & 2 as opposite phases to determine the inclusive set.
 	   // mask just stacks all groups masks, one after each other, so we can use this simple
 	   // trick here. The support group in this case has to coincide with groups 1+2, with no overlaps.
 	   // TODO: Add a test about it.
-	   if(i>itim->inclusive_map[2*INNER_PHASE] && i<itim->inclusive_map[2*INNER_PHASE+1] ){// "main group", of which we are taking atoms from the biggest cluster
-               if(itim->mask[i]==-1||itim->mask[i]>0) a2-=10000.; // not in the biggest cluster, let's shift it back away
-           } else { 
-               if(itim->mask[i]==0||itim->mask[i]>0) a2-=10000.; // in the biggest cluster
-	   }
-	   if(j>itim->inclusive_map[2*INNER_PHASE] && j<itim->inclusive_map[2*INNER_PHASE+1] ){// "main group", of which we are taking atoms from the biggest cluster
-               if(itim->mask[j]==-1||itim->mask[j]>0) b2-=10000.;
-           } else { 
-               if(itim->mask[j]==0||itim->mask[j]>0) b2-=10000.;
-           }
-	} else { 
-          if(itim->mask[i]==-1 || itim->mask[i]>0) a2-=10000.;
-          if(itim->mask[j]==-1 || itim->mask[j]>0) b2-=10000.;
-	}
+        if(! is_in_correct_phase(i)) a2-=10000.; // not in the biggest cluster, let's shift it back away
+        if(! is_in_correct_phase(j)) b2-=10000.; 
 	return (a2>b2?-1:1);
 }
 int projection_negative(const void * a, const void * b) {
@@ -1575,26 +1574,8 @@ int projection_negative(const void * a, const void * b) {
 	j = *(int*)b;	
 	a2 = itim->phase[SUPPORT_PHASE][3*i+2] - itim->radii[i] ;
 	b2 = itim->phase[SUPPORT_PHASE][3*j+2] - itim->radii[j] ;
-	if(itim->bInclusive){
-	   int size[3];
-	   size[0]=itim->n[SUPPORT_PHASE];
-	   size[1]=itim->n[SUPPORT_PHASE+1];
-	   size[2]=itim->n[SUPPORT_PHASE+2];
-	   if(i>itim->inclusive_map[2*INNER_PHASE] && i<itim->inclusive_map[2*INNER_PHASE+1] ){// "main group", of which we are taking atoms from the biggest cluster
-               if(itim->mask[i]==-1||itim->mask[i]>0) a2+=10000.; // not in the biggest cluster, let's shift it back away
-           } else { 
-               if(itim->mask[i]==0||itim->mask[i]>0) a2+=10000.; // in the biggest cluster
-	   }
-	   if(j>itim->inclusive_map[2*INNER_PHASE] && j<itim->inclusive_map[2*INNER_PHASE+1] ){// "main group", of which we are taking atoms from the biggest cluster
-               if(itim->mask[j]==-1||itim->mask[j]>0) b2+=10000.;
-           } else { 
-               if(itim->mask[j]==0||itim->mask[j]>0) b2+=10000.;
-           }
-
-	} else { 
-          if(itim->mask[i]==-1|| itim->mask[i]>0) a2+=10000.;
-          if(itim->mask[j]==-1|| itim->mask[j]>0) b2+=10000.;
-        }
+        if(! is_in_correct_phase(i)) a2+=10000.; // not in the biggest cluster, let's shift it back away
+        if(! is_in_correct_phase(j)) b2+=10000.; 
 	return (a2<b2?-1:1);
 }
 
@@ -1653,7 +1634,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
         i=0;
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
-		if(itim->mask[index]==0){
+		if(is_in_correct_phase(index)){
 			result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
 		}
           	i++ ; 
@@ -1666,7 +1647,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
 	qsort((void*)itim->phase_index[SUPPORT_PHASE], itim->n[SUPPORT_PHASE], sizeof(int) , projection_negative);
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
-		if(itim->mask[index]==0){
+		if(is_in_correct_phase(index)){
 			result = check_itim_testlines_periodic(DIR_NEGATIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
 		}
           	i++; 
@@ -1815,7 +1796,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 		p1[2]=*zpos;
 		while(p1[2]*P[2]<0){ /*i.e. they are on opposite sides, this can happen only with ITIM*/
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 1e6 ; }
+			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
 			zpos    = (real*) kd_res_item(presults, p1); 
 			p1[2]=*zpos;
 		}
@@ -1824,7 +1805,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
                 do {
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 1e6 ; }
+			if(kd_res_end(presults)){  fprintf(stderr,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
                 	kd_res_item(presults, p2); 
 
 			zpos    = (real*) kd_res_item(presults, p2); 
@@ -2089,7 +2070,7 @@ void init_itim(int nphases,int nadd_index) {
 	itim->dump_phase_points=dump_phase_points;
 }
 
-void generate_mask_ns(int bCluster, rvec * gmx_coords, int ** mask, int *nindex, int ** gmx_index_phase, matrix box, int  ng, int natoms, t_pbc pbc){
+void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** mask, int *nindex, int ** gmx_index_phase, matrix box, int  ng, int natoms, t_pbc pbc){
 /* New mask: -1 -> not in the main cluster
 	      0 -> layer not assigned
               i -> i-th layer (positive or negative) */
@@ -2129,6 +2110,7 @@ void generate_mask_ns(int bCluster, rvec * gmx_coords, int ** mask, int *nindex,
         }
         for (int g = 0; g < ng; g++)
         {
+		if(bInclusive && g==0 ) continue; /* we don't need it, we'll copy the info in reinit_mask() */ 
 		struct kdtree *kd =  kd_create(3);
 		struct kdres *kdresults;
 		rvec  xx;
@@ -2204,10 +2186,14 @@ void generate_mask_ns(int bCluster, rvec * gmx_coords, int ** mask, int *nindex,
 		   int largest=-1;
 		   for(int i = 0 ; i< nindex[g] ; i++) if(cluster_size[g][i]>=msize){msize=cluster_size[g][i] ; largest = i;}
 		   for(int i = 0 ; i< nindex[g] ; i++) if(cluster_map[g][i]==largest){(*mask)[incsize[g]+i]=0 ; }
-                 }
-		 free(idata);
+		   if(msize<=1){
+			 if(getenv("NO_CLUSTERSIZE_ERROR") == NULL)
+			   exit(printf("ERROR: the largest cluster for group index %d is %d, \nyou might have choosen a too small cutoff for the cluster algorithm\nSet the variable NO_CLUSTERSIZE_ERROR=1 to suppress this\n",g,msize));
+                   }
+		   free(idata);
 		// gmx_ana_nbsearch_free(data);
-                 kd_free( kd );
+                   kd_free( kd );
+		 }
 	}
 }
 
@@ -2222,6 +2208,7 @@ void reinit_mask(ITIM * itim){
            for(phase=INNER_PHASE;phase <=OUTER_PHASE ; phase++) { 
 		offset+=itim->n[phase-1];
 		for(atom=0;atom<itim->n[phase];atom++){
+			/* copy from the group "phase" to the corresponding portion of the SUPPORT_GROUP map" */
 			itim->mask[atom+itim->inclusive_map[2*phase]] = itim->mask[offset+atom];
 		}	
            } 
@@ -2540,7 +2527,7 @@ void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_
 		      /* New mask: -1 -> not in the main cluster
 				    0 -> layer not assigned
 				    i -> i-th layer (positive or negative) */ 
-                      generate_mask_ns(bCluster,gmx_coords,&mask,nindex, (int**)gmx_index_phase,box,itim->ngmxphases,natoms,pbc); 
+                      generate_mask_ns(bCluster,itim->bInclusive,gmx_coords,&mask,nindex, (int**)gmx_index_phase,box,itim->ngmxphases,natoms,pbc); 
 	              arrange_datapoints(itim, gmx_coords, nindex,  (int**)gmx_index_phase,mask);
                       reinit_mask(itim);
 		      for(itim->current_layer = 1 ; itim->current_layer <= itim->maxlayers  ; itim->current_layer ++){
