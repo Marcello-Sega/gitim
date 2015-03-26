@@ -1187,7 +1187,8 @@ int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int lin
        if(TYPE==COMPUTE_SIZE){
        	return index;   	
        } else { 
-	 exit(printf("Internal error: GET_HISTO_INDEX() called with wrong arguments at line %d: TYPE=%d, phase=%d, molecular=%d, layer=%d\n",line,TYPE,phase,molecular,layer));
+	   return -1000;
+	// exit(printf("Internal error: GET_HISTO_INDEX() called with wrong arguments at line %d: TYPE=%d, phase=%d, molecular=%d, layer=%d\n",line,TYPE,phase,molecular,layer));
        }
 }
 
@@ -2486,7 +2487,8 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
 		    if(j!=SUPPORT_PHASE && m==MOLECULAR) continue;
 	            int index     = GET_HISTO_INDEX(INTRINSIC_DENSITY,j,                 i,m     ,__LINE__);
 	            int index_rnd = GET_HISTO_INDEX(INTRINSIC_DENSITY,itim->RANDOM_PHASE,0,ATOMIC,__LINE__);
-		    //printf("Normalizing index %d\n",index);
+		    if(index==-1000 || index_rnd == -1000) continue;
+		    printf("Normalizing index %d\n",index);
   	            for(int k=0;k<histo->nbins;k++){
                          double norm =  histo->rdata[index_rnd*histo->nbins + k ];
 			// printf("Normalizing index=%d bin %d using norm %g\n",index,k,norm);
