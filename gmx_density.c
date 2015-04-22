@@ -185,8 +185,11 @@ typedef struct {
 	int * gmx_alpha_id;
 	int * gmx_alpha_phase_id;
 	int ** gmx_index;
+	int *indexm; // for the molecular version of the support group.
+	int *backindex; // for the molecular version of the support group.
 	int com_opt[64];
         int bCom;
+        int bMol;
         int bInclusive;
         int bMCnormalization;
         int bOrder;
@@ -1122,7 +1125,7 @@ real * global_charges=NULL;
 #ifdef INTEGER_HISTO
 unsigned long long int * int_histo;
 #endif
-ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins, int maxlayers,real * radii, int ** index, int *gnx,int *com_opt, int bOrder, int bInclusive, int dump_mol, int bMCnormalization, const char ** geometry, int ngrps_add);
+ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins, int maxlayers,real * radii, int ** index, int *gnx,int *com_opt, int bOrder, int bInclusive, int dump_mol, int bMCnormalization, const char ** geometry, int ngrps_add, int bMol, t_topology * top);
 
 
 void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top, char dens_opt, t_trxframe * fr);
@@ -1439,7 +1442,17 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 		if (is_in_correct_phase(index)) { // in  main cluster, layer not yet assigned
 		
 			itim->mask[index]=itim->current_layer;
-
+			if(itim->bMol) {  // let's add all other atoms in the molecule to the layer.
+				int mol = itim->indexm[gmx_index_phase[SUPPORT_PHASE][index]];
+                                //printf("mol %d phaseid %d  atomid %d (max = %d)\n",mol, index,gmx_index_phase[SUPPORT_PHASE][index],itim->n[SUPPORT_PHASE]);
+			        int i1 = itim->backindex[mol];	
+			        int i2 = itim->backindex[mol+1];	
+				int k ; 
+				for(k=i1;k<i2;k++){
+					itim->mask[k] = itim->current_layer;
+				}
+				
+			}
 			if(itim->current_layer==1) { 
 		          itim->alpha_index[itim->nalphapoints] = index;
 			  if(itim->alphapoints==NULL) exit(printf("Error reallocating alphapoints\n"));
@@ -2071,6 +2084,7 @@ void init_itim(int nphases,int nadd_index) {
 	itim->dump_surface_points=dump_surface_points;
 	itim->dump_surface_molecules=dump_surface_molecules;
 	itim->dump_phase_points=dump_phase_points;
+        
 }
 
 void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** mask, int *nindex, int ** gmx_index_phase, matrix box, int  ng, int natoms, t_pbc pbc){
@@ -2401,7 +2415,7 @@ void check_inclusive_conditions(atom_id ** index, int *gnx){
 
 
 
-ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int bOrder, int bInclusive, int dump_mol, int bMCnormalization , const char ** geometry, int ngrps_add){
+ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int bOrder, int bInclusive, int dump_mol, int bMCnormalization , const char ** geometry, int ngrps_add, int bMol, t_topology * top){
 	    ITIM * itim;
 	    int i;
             int histofactor=1;
@@ -2412,6 +2426,7 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
 	    itim->nadd_index =  ngrps_add;
 	    itim->maxlayers = maxlayers;
      	    itim->method = METHOD_ITIM;
+            itim->bMol=bMol;
             itim->bOrder=bOrder;
             itim->bInclusive=bInclusive;
             itim->bMCnormalization=bMCnormalization;
@@ -2445,6 +2460,18 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
 		itim->radii[i] = radii[gmx_index[SUPPORT_PHASE][i]];
 	    }
             itim->gmx_index = gmx_index;
+	    if(itim->bMol) {  // TODO: check if some of the other spol_atom2molindex() calls can be replaced by referencing this index here...
+		int isizem=gnx[SUPPORT_PHASE];  
+		itim->indexm = (int*) malloc(isizem*sizeof(int));
+		itim->backindex= (int*) malloc((top->mols.nr+1)*sizeof(int));
+		for(i=0;i<gnx[SUPPORT_PHASE];i++) itim->indexm[i]=itim->gmx_index[SUPPORT_PHASE][i]; // NOTE: TODO check "additional"  under the PATCH case
+                spol_atom2molindex(&isizem, itim->indexm,itim->backindex, &(top->mols));
+	   //     printf(" === %d === \n",gnx[SUPPORT_PHASE]);
+           //     for(i=0;i<gnx[SUPPORT_PHASE];i++) { 
+	//		printf("atom %d: mol %d\n ",i,itim->indexm[i]);
+//		}
+//		exit(0); SAW REMOVE ME
+            }
 	    return itim;
 }
 
@@ -2568,10 +2595,15 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 					case 'c': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].q; break;
 					case 'n': value = 1; break;
 #ifdef VIRIAL_EXTENSION
-					case 'v': 
+					case 't': 
 						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
 						value = (0.5 * (tmprvec[0]+tmprvec[1]) - tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
+						break;
+					case 'p': 
+						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
+						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
+						value = (tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
 						break;
 #endif
 					default : value =1 ; break;
@@ -2734,10 +2766,15 @@ This is too cluttered. Reorganize the code...
 			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
 			    	case 'n': value = 1; break;
 #ifdef VIRIAL_EXTENSION
-			    	case 'v': 
+			    	case 't': 
 						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
 						value = (0.5 * (tmprvec[0]+tmprvec[1]) - tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
+						break ; 
+			    	case 'p': 
+						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
+						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
+						value = (tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
 						break ; 
 #endif
 			    	default : value =1 ; break;
@@ -3221,7 +3258,8 @@ void plot_density(real *slDensity[], const char *afile, int nslices,
   case 'c': ylabel = "Charge density (e nm\\S-3\\N)"; break;
   case 'e': ylabel = "Electron density (e nm\\S-3\\N)"; break;
 #ifdef VIRIAL_EXTENSION
-  case 'v': ylabel = "Surface tension (kJ)"; break;
+  case 't': ylabel = "Surface tension density (atm)"; break;
+  case 'p': ylabel = "Normal pressure density (atm)"; break;
 #endif
   case 's': return;
   }
@@ -3319,7 +3357,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		  real ***slDensity, int *nslices, int maxlayers, t_topology *top, int ePBC,
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
                   real alpha,int *com_opt, int bOrder, int bInclusive, const char ** geometry, 
-                  int bDump,int bDumpPhases,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt,int ngrps_add){
+                  int bDump,int bDumpPhases,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt,int ngrps_add, int bMol){
 	enum {NO_ADDITIONAL_INFO=0,ADDITIONAL_INFO=1};
 	ITIM * itim;
 	real * radii;
@@ -3345,7 +3383,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
           gmx_fatal(FARGS,"Error loading the trajectory\n");
 	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
 
-        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add); 
+        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add, bMol,top); 
 
 	if(bDump)
         	surf_cid=fopen("surf.gro","w"); // TODO: from command line, or at least switchable!
@@ -3456,7 +3494,7 @@ int gmx_density(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "virial",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure",  NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
@@ -3468,6 +3506,7 @@ int gmx_density(int argc,char *argv[])
   int com_opt[64];
   int dump_mol=0;
   int bCom=FALSE; 
+  int bMol=FALSE;
   int bMCnormalization=0; 
   char com_opt_file[1024];
   static gmx_bool bCenter=FALSE;
@@ -3510,6 +3549,8 @@ int gmx_density(int argc,char *argv[])
       "number of layers to analyze" },
     { "-MCnorm", FALSE, etBOOL, {&bMCnormalization}, 
       "automatic normalization using MC calculation for arbitrary coordinate systems" },
+    { "-mol", FALSE, etBOOL, {&bMol}, 
+      "Does molecule-based intrinsic analysis" },
     { "-com", FALSE, etBOOL, {&bCom}, 
       "with the -intrinsic option, perform a molecule-based intrinsic analysis. One should give to this flag the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." }
   };
@@ -3629,7 +3670,7 @@ exit(0);
 
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
-    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0],ngrps_add);
+    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0],ngrps_add,bMol);
     plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm),dens_opt[0][0]);
 
   } else { 	
