@@ -71,7 +71,12 @@ NOTE: how to acess atom properties
 #include "tpxio.h"
 #include "gmx_ana.h"
 #include <nbsearch.h>
-
+#ifdef UNIX  
+// used for handling signals
+#include<stdio.h>
+#include<signal.h>
+#include<unistd.h>
+#endif //UNIX
 
 #define gmx_ffopen ffopen
 #define gmx_ffclose ffclose
@@ -122,6 +127,9 @@ NOTE: how to acess atom properties
 #endif
 
 #define NORMAL_UNDEFINED -100
+
+int global_interrupt = 0;
+
 typedef	enum { SUPPORT_PHASE=0, INNER_PHASE=1, OUTER_PHASE=2 } PHASE; // These value are not arbitrary and should not be changed.
  /* These value are not arbitrary and should not be changed: 
       OFF_NUMBER    -> for number density profile, used to normalize the order parameter density profile as well.
@@ -1330,6 +1338,7 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	}
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
 	       atom_index = itim->gmx_index[SUPPORT_PHASE][i];
+               double m = itim->masses[atom_index];
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
@@ -1337,9 +1346,9 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
                  f[3*layer]   += fr->f[atom_index][0];
                  f[3*layer+1] += fr->f[atom_index][1];
                  f[3*layer+2] += fr->f[atom_index][2];
-                 vir[3*layer]   += fr->vir[atom_index][0];
-                 vir[3*layer+1] += fr->vir[atom_index][1];
-                 vir[3*layer+2] += fr->vir[atom_index][2];
+                 vir[3*layer]   +=  fr->vir[atom_index][0];
+                 vir[3*layer+1] +=  fr->vir[atom_index][1];
+                 vir[3*layer+2] +=  fr->vir[atom_index][2];
 #endif
                }
         }
@@ -2598,12 +2607,12 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 					case 't': 
 						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (0.5 * (tmprvec[0]+tmprvec[1]) - tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
+						value = (-0.5 * (tmprvec[0]+tmprvec[1]) + tmprvec[2]) / tmpreal;  
 						break;
 					case 'p': 
 						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
+						value = ( tmprvec[2]) / tmpreal; 
 						break;
 #endif
 					default : value =1 ; break;
@@ -3353,6 +3362,17 @@ void flip_atoms_in_box(int natoms, int normal,  rvec * x0){
 	}
 }
 
+#ifdef UNIX
+void sig_handler(int signo)
+{
+  if (signo == SIGINT) { 
+    printf("\n\n === Caught SIGINT, trying to terminate analysis and save all files...\n\n");
+    global_interrupt = 1 ;
+  }
+}
+#endif //UNIX
+
+
 void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		  real ***slDensity, int *nslices, int maxlayers, t_topology *top, int ePBC,
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
@@ -3378,7 +3398,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	radii = load_radii(top);
 //        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
 //          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
-	flags = TRX_READ_X |  TRX_READ_F ;
+	flags = TRX_READ_X | TRX_READ_V |  TRX_READ_F ;
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
           gmx_fatal(FARGS,"Error loading the trajectory\n");
 	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
@@ -3410,6 +3430,12 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	if(bInclusive) check_inclusive_conditions(index, gnx);
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
+#ifdef UNIX
+		if (signal(SIGINT, sig_handler) == SIG_ERR) {
+			printf("Error handling SIGINT");
+			// sets global_interrupt to 1 when catching SIGINT
+		}
+#endif //UNIX
 		x0 = fr.x;	
         	natoms = fr.natoms;
 		for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
@@ -3454,7 +3480,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
  		   compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
                 }
 
-  	} while (read_next_frame(oenv,status,&fr));
+  	} while (read_next_frame(oenv,status,&fr) &&  (global_interrupt == 0) );
 
         if(surf_cid  !=NULL)fclose(surf_cid);
         if(surfmol_cid!=NULL)fclose(surfmol_cid);

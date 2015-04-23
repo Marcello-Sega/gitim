@@ -10,6 +10,11 @@ if(NOT ENVSRCDIR)
 	MESSAGE(STATUS $ENV{MYGMX_SRC})
 	MESSAGE(FATAL_ERROR "\nERROR: set the variables MYGMX_SRC  and MYGMX_BUILD to specify a particular path for gromacs source and build directories" )
 endif(NOT ENVSRCDIR)
+
+IF(${UNIX}) 
+ ADD_DEFINITIONS(-DUNIX)
+ENDIF(${UNIX})
+
 #IF(VIRIAL_EXTENSION)
 #	 add_definitions(-DVIRIAL_EXTENSION)
 #ENDIF(VIRIAL_EXTENSION)
