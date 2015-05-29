@@ -32,6 +32,38 @@
  * And Hey:
  * Green Red Orange Magenta Azure Cyan Skyblue
  */
+//// TODO: fix these includes 
+// #if GMX_VERSION>=50000
+#define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c))
+#define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(e),(f))
+#include "gmxpre.h"
+
+#include <ctype.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "gromacs/commandline/pargs.h"
+#include "gromacs/fileio/tpxio.h"
+#include "gromacs/fileio/trxio.h"
+#include "gromacs/fileio/xvgr.h"
+#include "gromacs/gmxana/gmx_ana.h"
+#include "gromacs/gmxana/gstat.h"
+#include "gromacs/legacyheaders/macros.h"
+#include "gromacs/legacyheaders/typedefs.h"
+#include "gromacs/legacyheaders/viewit.h"
+#include "gromacs/math/units.h"
+#include "gromacs/math/vec.h"
+#include "gromacs/pbcutil/pbc.h"
+#include "gromacs/pbcutil/rmpbc.h"
+#include "gromacs/topology/index.h"
+#include "gromacs/utility/cstringutil.h"
+#include "gromacs/utility/fatalerror.h"
+#include "gromacs/utility/futil.h"
+#include "gromacs/utility/smalloc.h"
+
+// #endif  GMX_VERSION >=50000
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -43,9 +75,9 @@
 #include <sys/time.h>
 #endif
 
-#include "sysstuff.h"
+//#include "sysstuff.h"
 #include "string.h"
-#include "string2.h"
+//#include "string2.h"
 #include "typedefs.h"
 #include "smalloc.h"
 #include "macros.h"
@@ -55,17 +87,84 @@
 #include "pbc.h"
 #include "copyrite.h"
 #include "futil.h"
-#include "statutil.h"
-#include "index.h"
+//#include "statutil.h"
+//#include "index.h"
 #include "tpxio.h"
-#include "physics.h"
+//#include "physics.h"
 #include "gmx_ana.h"
+#define NORMAL_UNDEFINED -100
+typedef	enum { SUPPORT_PHASE=0, INNER_PHASE=1, OUTER_PHASE=2, RANDOM_PHASE=3 } PHASE; // These value are not arbitrary and should not be changed.
+ /* These value are not arbitrary and should not be changed: 
+      OFF_NUMBER    -> for number density profile, used to normalize the order parameter density profile as well.
+      OFF_ORDER[12] -> for order parameter density profile wrt macroscopic axis
+      OFF_ORDER[34] -> for order parameter density profile wrt microscopic axis
+  */
+typedef	enum { OFF_NUMBER=4, OFF_ORDER1=7, OFF_ORDER1_2=10, OFF_ORDER2=13,  OFF_ORDER2_2=16, 
+               OFF_ORDER3=19, OFF_ORDER3_2=22, OFF_ORDER4=25, OFF_ORDER4_2=28} HISTO_OFFSET; 
+typedef enum {SURFACE_PLANE, SURFACE_SPHERE, SURFACE_CYLINDER, SURFACE_GENERIC } GEOMETRY;
+typedef	enum { NONE, PATCH, FULL} PERIODIC ; 
+typedef	enum { METHOD_ITIM, METHOD_A_SHAPE} METHOD; 
+
+typedef struct {
+	struct kdtree * tree;
+	int * flag;
+	int n[2];
+	real size[2];
+ 	int nelem;
+} MESH;
+/* TODO: put alphashape / surface variables in a separate structure, to be included here ?*/
+typedef struct { 
+	real box[3];
+	real alpha;
+	real * masses;
+	real * charges;
+	real skin;
+	real range;
+	real *pradii;
+	int nphases;
+	int ngmxphases;
+	int normal;
+	int info;
+        int n_histo;
+	real ** phase;
+	int ** phase_index;
+	int *n;
+	real * alphapoints;
+	int nalphapoints;
+	int * alpha_index;
+#ifdef ALPHA
+        setT * alphashape;
+#endif
+	real * radii;
+	int * gmx_alpha_id;
+	int * gmx_alpha_phase_id;
+	int ** gmx_index;
+	int com_opt[64];
+        int bCom;
+        int bMCnormalization;
+        int bOrder;
+	real target_mesh_size;
+	MESH mesh;
+	GEOMETRY geometry;
+	PERIODIC *periodic;
+	METHOD method;
+	char method_name[2][128];
+	void (* dump_surface_points)(t_topology*,FILE*);		
+	void (* dump_surface_molecules)(t_topology*,FILE*);		
+	void (* dump_phase_points)(PHASE,t_topology*,FILE*);		
+
+} ITIM;
+
+ITIM * global_itim;
+
 #ifndef _KDTREE_H_
 #define _KDTREE_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define my_min(a,b) ( (a) > (b) ? (b) : (a))
 
 // TODO: make it an option? change the algorithm ? 
 #define MAX_KDTREE_CHECK 40
@@ -253,7 +352,7 @@ static real hyperrect_dist_sq(struct kdhyperrect *rect, const real *pos);
 static struct res_node *alloc_resnode(void);
 static void free_resnode(struct res_node*);
 #else
-#define alloc_resnode()		malloc(sizeof(struct res_node))
+#define alloc_resnode()		(struct res_node*)malloc(sizeof(struct res_node))
 #define free_resnode(n)		free(n)
 #endif
 
@@ -263,7 +362,7 @@ struct kdtree *kd_create(int k)
 {
 	struct kdtree *tree;
 
-	if(!(tree = malloc(sizeof *tree))) {
+	if(!(tree = (struct kdtree*)malloc(sizeof *tree))) {
 		return 0;
 	}
 
@@ -320,10 +419,10 @@ static int insert_rec(struct kdnode **nptr, const real *pos, real *data, int dir
 	struct kdnode *node;
 
 	if(!*nptr) {
-		if(!(node = malloc(sizeof *node))) {
+		if(!(node = (struct kdnode*)malloc(sizeof *node))) {
 			return -1;
 		}
-		if(!(node->pos = malloc(dim * sizeof *node->pos))) {
+		if(!(node->pos = (real*)malloc(dim * sizeof *node->pos))) {
 			free(node);
 			return -1;
 		}
@@ -375,7 +474,7 @@ int kd_insertf(struct kdtree *tree, const float *pos, real *data)
 			bptr = buf = alloca(dim * sizeof *bptr);
 		else
 #endif
-			if(!(bptr = buf = malloc(dim * sizeof *bptr))) {
+			if(!(bptr = buf = (real*)malloc(dim * sizeof *bptr))) {
 				return -1;
 			}
 	} else {
@@ -418,13 +517,22 @@ static int find_nearest(struct kdnode *node, const real *pos, real range, struct
 {
 	real dist_sq, dx;
 	int i, ret, added_res = 0;
-
+	ITIM * itim = global_itim ;
 	if(!node) return 0;
 
 	dist_sq = 0;
-	for(i=0; i<dim; i++) {
-		dist_sq += SQ(node->pos[i] - pos[i]);
-	}
+        if(itim!=NULL) { 
+	  for(i=0; i<dim; i++) {
+	  	dist_sq += SQ(node->pos[i] - pos[i]);
+	  }
+        } else { 
+	  for(i=0; i<dim; i++) {
+		real  dist = node->pos[i] - pos[i];
+		while(dist > itim->box[i]/2.)  dist-=itim->box[i];
+		while(dist < -itim->box[i]/2.) dist+=itim->box[i];
+	  	dist_sq += SQ(dist);
+	  }
+        }
 	if(dist_sq <= SQ(range)) {
 		if(rlist_insert(list, node, ordered ? dist_sq : -1.0) == -1) {
 			return -1;
@@ -520,7 +628,7 @@ struct kdres *kd_nearest(struct kdtree *kd, const real *pos)
 	if (!kd->rect) return 0;
 
 	/* Allocate result set */
-	if(!(rset = malloc(sizeof *rset))) {
+	if(!(rset = (struct kdres *)malloc(sizeof *rset))) {
 		return 0;
 	}
 	if(!(rset->rlist = alloc_resnode())) {
@@ -576,7 +684,7 @@ struct kdres *kd_nearestf(struct kdtree *tree, const float *pos)
 			bptr = buf = alloca(dim * sizeof *bptr);
 		else
 #endif
-			if(!(bptr = buf = malloc(dim * sizeof *bptr))) {
+			if(!(bptr = buf = (real *)malloc(dim * sizeof *bptr))) {
 				return 0;
 			}
 	} else {
@@ -620,7 +728,7 @@ struct kdres *kd_nearest_range(struct kdtree *kd, const real *pos, real range)
 	int ret;
 	struct kdres *rset;
         
-	if(!(rset = malloc(sizeof *rset))) {
+	if(!(rset = (struct kdres *) malloc(sizeof *rset))) {
 		return 0;
 	}
 	if(!(rset->rlist = alloc_resnode())) {
@@ -652,7 +760,7 @@ struct kdres *kd_nearest_rangef(struct kdtree *kd, const float *pos, float range
 			bptr = buf = alloca(dim * sizeof *bptr);
 		else
 #endif
-			if(!(bptr = buf = malloc(dim * sizeof *bptr))) {
+			if(!(bptr = buf = (real *)malloc(dim * sizeof *bptr))) {
 				return 0;
 			}
 	} else {
@@ -775,16 +883,16 @@ static struct kdhyperrect* hyperrect_create(int dim, const real *min, const real
 	size_t size = dim * sizeof(real);
 	struct kdhyperrect* rect = 0;
 
-	if (!(rect = malloc(sizeof(struct kdhyperrect)))) {
+	if (!(rect =(struct kdhyperrect* )malloc(sizeof(struct kdhyperrect)))) {
 		return 0;
 	}
 
 	rect->dim = dim;
-	if (!(rect->min = malloc(size))) {
+	if (!(rect->min = (real *)malloc(size*sizeof(real*)))) {
 		free(rect);
 		return 0;
 	}
-	if (!(rect->max = malloc(size))) {
+	if (!(rect->max = (real *)malloc(size*sizeof(real*)))) {
 		free(rect->min);
 		free(rect);
 		return 0;
@@ -856,7 +964,7 @@ static struct res_node *alloc_resnode(void)
 #endif
 
 	if(!free_nodes) {
-		node = malloc(sizeof *node);
+		node = (struct res_node *)malloc(sizeof *node);
 	} else {
 		node = free_nodes;
 		free_nodes = free_nodes->next;
@@ -956,70 +1064,7 @@ typedef struct {
 	real box[3];
 	real ref[3];
 } qsort_data;
-#define NORMAL_UNDEFINED -100
-typedef	enum { SUPPORT_PHASE=0, INNER_PHASE=1, OUTER_PHASE=2, RANDOM_PHASE=3 } PHASE; // These value are not arbitrary and should not be changed.
- /* These value are not arbitrary and should not be changed: 
-      OFF_NUMBER    -> for number density profile, used to normalize the order parameter density profile as well.
-      OFF_ORDER[12] -> for order parameter density profile wrt macroscopic axis
-      OFF_ORDER[34] -> for order parameter density profile wrt microscopic axis
-  */
-typedef	enum { OFF_NUMBER=4, OFF_ORDER1=7, OFF_ORDER1_2=10, OFF_ORDER2=13,  OFF_ORDER2_2=16, 
-               OFF_ORDER3=19, OFF_ORDER3_2=22, OFF_ORDER4=25, OFF_ORDER4_2=28} HISTO_OFFSET; 
-typedef enum {SURFACE_PLANE, SURFACE_SPHERE, SURFACE_CYLINDER, SURFACE_GENERIC } GEOMETRY;
-typedef	enum { NONE, PATCH, FULL} PERIODIC ; 
-typedef	enum { METHOD_ITIM, METHOD_A_SHAPE} METHOD; 
 
-typedef struct {
-	struct kdtree * tree;
-	int * flag;
-	int n[2];
-	real size[2];
- 	int nelem;
-} MESH;
-/* TODO: put alphashape / surface variables in a separate structure, to be included here ?*/
-typedef struct { 
-	real box[3];
-	real alpha;
-	real * masses;
-	real * charges;
-	real skin;
-	real range;
-	real *pradii;
-	int nphases;
-	int ngmxphases;
-	int normal;
-	int info;
-        int n_histo;
-	real ** phase;
-	int ** phase_index;
-	int *n;
-	real * alphapoints;
-	int nalphapoints;
-	int * alpha_index;
-#ifdef ALPHA
-        setT * alphashape;
-#endif
-	real * radii;
-	int * gmx_alpha_id;
-	int * gmx_alpha_phase_id;
-	int ** gmx_index;
-	int com_opt[64];
-        int bCom;
-        int bMCnormalization;
-        int bOrder;
-	real target_mesh_size;
-	MESH mesh;
-	GEOMETRY geometry;
-	PERIODIC *periodic;
-	METHOD method;
-	char method_name[2][128];
-	void (* dump_surface_points)(t_topology*,FILE*);		
-	void (* dump_surface_molecules)(t_topology*,FILE*);		
-	void (* dump_phase_points)(PHASE,t_topology*,FILE*);		
-
-} ITIM;
-
-ITIM * global_itim;
 real * global_real_pointer;
 real * global_masses=NULL;
 real * global_charges=NULL;
@@ -1271,7 +1316,7 @@ void init_itim_grid(ITIM * itim){
 	pos[1] = - itim->box[1]/2 ;
 	for(i=0;i<itim->mesh.nelem;i++){
              	itim->mesh.flag[i]=DIR_POSITIVE;   
-		kd_insert(itim->mesh.tree, pos, (void*)&(itim->mesh.flag[i])); 
+		kd_insert(itim->mesh.tree, pos, (real*)&(itim->mesh.flag[i])); 
 		pos[0] += itim->mesh.size[0]; 
 		if(pos[0] >= itim->box[0]/2){
 			pos[1]+= itim->mesh.size[1]; 
@@ -1391,7 +1436,7 @@ void check_kdtree ( struct kdtree * Surface, real * point , real range, real ** 
  	while( !kd_res_end( presults ) ) {
                   /* get the data and position of the current result item */
 		  if(3*(iter+offset)+2 >= *rp_n) { 
-			*rp_n+=4*(iter+offset) ; *result_points = realloc (*result_points,*rp_n*sizeof(real) );
+			*rp_n+=4*(iter+offset) ; *result_points = (real*)realloc (*result_points,*rp_n*sizeof(real) );
 			if(*result_points==NULL) exit(printf("Error in realloc\n"));
                   }
 #ifdef ALPHA
@@ -1475,7 +1520,7 @@ int check_itim_testlines_periodic(Direction face, int index, real * pos,real sig
 			periodic[0]=pos[0]-itim->box[0];
 		ret *= check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
         }
-	check_itim_testlines(0,0, NULL,0,NULL,1,NULL,NULL,NULL); // this just resets the flag within check_itim_testlines.
+	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); // this just resets the flag within check_itim_testlines.
 	return ret;
 }
 int projection(const void * a, const void * b) {
@@ -1510,8 +1555,8 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
           	i++ ; 
 		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE])); }
 	} while (result) ;
-	check_itim_testlines(0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
-	check_itim_testlines(0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
+	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
+	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
         /* The negative side */
         i = itim->n[SUPPORT_PHASE]-1;
 	do { 
@@ -1520,8 +1565,8 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
           	i--; 
 		if(i<0) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the negative side...\n",itim->n[SUPPORT_PHASE])); }
 	} while (result) ;
-	check_itim_testlines(0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
-	check_itim_testlines(0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
+	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
+	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
 
 }
 
@@ -2440,7 +2485,7 @@ void dump_surface_molecules(t_topology* top,FILE* cid){
 void init_itim(int nphases) { 
 	ITIM * itim;
 	int i;
-	global_itim=malloc(sizeof(ITIM));
+	global_itim=(ITIM*)malloc(sizeof(ITIM));
 	itim=global_itim;
 	sprintf(itim->method_name[METHOD_ITIM],"itim");
 	sprintf(itim->method_name[METHOD_A_SHAPE],"alpha-shapes");
@@ -2483,7 +2528,7 @@ void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_
 	real radius=0;
 	int realloc_factor=2;
 	real x,y,z;
-	PHASE phase;
+	int phase;
         for(phase=SUPPORT_PHASE; phase < itim->ngmxphases ; phase++) { 
           /* at the first iteration, itim->n are all zero  (initialized by init_itim() )*/
           if(itim->n[phase]<nindex[phase]) { 
@@ -2595,7 +2640,7 @@ void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_
 Histogram * histo_init(int N, int nbins, real range) { 
 
 	Histogram * histo = histo_histo;
-	histo = malloc(N*sizeof(Histogram));
+	histo = (Histogram*)malloc(N*sizeof(Histogram));
 	histo->N=N;
 	histo->nbins= nbins; // we are sampling half of the boxlength
 	histo->iterations= 0;
@@ -2973,7 +3018,7 @@ This is too cluttered. Reorganize the code...
 	case SURFACE_PLANE:   size=itim->box[2]/2; size2=size*size; break;
         case SURFACE_SPHERE: 
         case SURFACE_GENERIC: 
-			      size = min(min(itim->box[2],itim->box[1]),itim->box[0])/2; size2=size*size; break;
+			      size = my_min(my_min(itim->box[2],itim->box[1]),itim->box[0])/2; size2=size*size; break;
         default: exit(printf("Not implemented\n"));
     }
 // TODO: here gitim takes much more time than itim. Memory issue? check it...
@@ -3177,7 +3222,7 @@ int get_electrons(t_electron **eltab, const char *fn)
   int nr;            /* number of atomstypes to read */
   int i;
 
-  if ( !(in = ffopen(fn,"r")))
+  if ( !(in = gmx_ffopen(fn,"r")))
     gmx_fatal(FARGS,"Couldn't open %s. Exiting.\n",fn);
 
   if(NULL==fgets(buffer, 255, in))
@@ -3196,9 +3241,9 @@ int get_electrons(t_electron **eltab, const char *fn)
     if (sscanf(buffer, "%s = %d", tempname, &tempnr) != 2)
       gmx_fatal(FARGS,"Invalid line in datafile at line %d\n",i+1);
     (*eltab)[i].nr_el = tempnr;
-    (*eltab)[i].atomname = strdup(tempname);
+    sprintf((*eltab)[i].atomname ,tempname);
   }
-  ffclose(in);
+  gmx_ffclose(in);
   
   /* sort the list */
   fprintf(stderr,"Sorting list..\n");
@@ -3208,7 +3253,7 @@ int get_electrons(t_electron **eltab, const char *fn)
   return nr;
 }
 
-void remove_phase_pbc(t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
+void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
      /*we assume here that atoms have been already put into the box */
      /* compute the density at different control points: box edges, middle + some more */
      int rho[5],rho_max,i,nbins=25; 
@@ -3221,7 +3266,7 @@ void remove_phase_pbc(t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *
      	   for(i=0; (i<atoms->nr); i++) {
 	   	x0[i][axis]+=shift;
 	   }
-	   put_atoms_in_box(box,atoms->nr,x0);
+	   put_atoms_in_box(ePBC,box,atoms->nr,x0);
          }
          rho[0]=rho[1]=rho[2]=rho[3]=rho[4]=0;
          for(i=0; (i<index_nr); i++) {
@@ -3336,7 +3381,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
   for (i = 0; i < nr_grps; i++)
     snew((*slDensity)[i], *nslices);
   
-  gpbc = gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
+  gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
   /*********** Start processing trajectory ***********/
   do {
     gmx_rmpbc(gpbc,natoms,box,x0);
@@ -3356,7 +3401,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
 	  /* determine which slice atom is in */
 	  slice = (z / (*slWidth)); 
 	  sought.nr_el = 0;
-	  sought.atomname = strdup(*(top->atoms.atomname[index[n][i]]));
+	  sprintf(sought.atomname, *(top->atoms.atomname[index[n][i]]));
 
 	  /* now find the number of electrons. This is not efficient. */
 	  found = (t_electron *)
@@ -3374,7 +3419,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
 	}
     }
       nr_frames++;
-  } while (read_next_x(oenv,status,&t,natoms,x0,box));
+  } while (wrap_read_next_x(oenv,status,&t,natoms,x0,box));
   gmx_rmpbc_done(gpbc);
 
   /*********** done with status file **********/
@@ -3442,7 +3487,7 @@ void calc_density(const char *fn, atom_id **index, int gnx[],
   for (i = 0; i < nr_grps; i++)
     snew((*slDensity)[i], *nslices);
   
-  gpbc = gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
+  gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
   /*********** Start processing trajectory ***********/
   do {
     gmx_rmpbc(gpbc,natoms,box,x0);
@@ -3468,7 +3513,7 @@ void calc_density(const char *fn, atom_id **index, int gnx[],
     }
 
     nr_frames++;
-  } while (read_next_x(oenv,status,&t,natoms,x0,box));
+  } while (wrap_read_next_x(oenv,status,&t,natoms,x0,box));
   gmx_rmpbc_done(gpbc);
 
   /*********** done with status file **********/
@@ -3528,7 +3573,7 @@ void plot_density(real *slDensity[], const char *afile, int nslices,
     fprintf(den,"\n");
   }
 
-  ffclose(den);
+  gmx_ffclose(den);
 }
  
 void plot_order(real *slDensity[], const char *afile, int nslices,
@@ -3558,7 +3603,7 @@ void plot_order(real *slDensity[], const char *afile, int nslices,
   }
   }
 
-  ffclose(den);
+  gmx_ffclose(den);
 }
  
 
@@ -3614,6 +3659,8 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	matrix box;
         t_trxstatus * status ;	
   	gmx_rmpbc_t  gpbc=NULL;
+	t_pbc  pbc;
+
         surf_cid=fopen("surf.gro","w"); // TODO: from command line, or at least switchable!
         surfmol_cid=fopen("surfmol.gro","w"); 
         phase_cid=fopen("phase.gro","w");
@@ -3621,17 +3668,18 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	radii = load_radii(top);
         if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
           gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
-  	gpbc = gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
+  	gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
 
         itim = init_intrinsic_surface(axis, alpha, 0.05,  box, nr_grps, nslices,radii,index,gnx,com_opt,bOrder,bMCnormalization,geometry); 
                /* TODO: decide if the density of test lines (0.05) should be hardcoded or not.*/
 	do { 
 // FIXME : when no pbc are defined, it loops forever... 
     		gmx_rmpbc(gpbc,natoms,box,x0);
+        	set_pbc(&pbc, ePBC, box);
                 if(bCenter){
-		    put_atoms_in_box(box,natoms,x0);
+		    put_atoms_in_box(ePBC,box,natoms,x0);
 	            /* Make our reference phase whole */
-		    remove_phase_pbc(&top->atoms,box, x0, axis, index[0], gnx[0]);
+		    remove_phase_pbc(ePBC,&top->atoms,box, x0, axis, index[0], gnx[0]);
                 }
 		/* Now center the com of the reference phase in the middle of the box (the one from -box/2 to box/2, 
                    not the gromacs std one:), and shift/rebox the rest accordingly */
@@ -3658,7 +3706,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 
 
 		
-  	} while (read_next_x(oenv,status,&t,natoms,x0,box));
+  	} while (wrap_read_next_x(oenv,status,&t,natoms,x0,box));
 	if(dens_opt!='s')   
 	   finalize_intrinsic_profile(slDensity, nslices, slWidth);
 
@@ -3748,7 +3796,11 @@ int main(int argc,char *argv[])
   t_filenm  fnm[] = {    /* files for g_density 	  */
     { efTRX, "-f", NULL,  ffREAD },  
     { efNDX, NULL, NULL,  ffOPTRD }, 
+#if GMX_VERSION < 50000
     { efTPX, NULL, NULL,  ffREAD },    	    
+#else
+    { efTPR, NULL, NULL,  ffREAD },    	    
+#endif
     { efDAT, "-ei", "electrons", ffOPTRD }, /* file with nr. of electrons */
     { efXVG,"-o","density",ffWRITE }, 	    
   };
@@ -3758,8 +3810,7 @@ geometry[0]=geometry[1];
 #endif
 #define NFILE asize(fnm)
 
-  CopyRight(stderr,argv[0]);
-  parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME | PCA_BE_NICE,
+  parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME,
 		    NFILE,fnm,asize(pa),pa,asize(desc),desc,asize(bugs),bugs,
                     &oenv);
 
@@ -3770,8 +3821,11 @@ geometry[0]=geometry[1];
   /* Calculate axis */
   axis = toupper(axtitle[0]) - 'X';
   
+#if GMX_VERSION < 50000
   top = read_top(ftp2fn(efTPX,NFILE,fnm),&ePBC);     /* read topology file */
-
+#else 
+  top = read_top(ftp2fn(efTPR,NFILE,fnm),&ePBC);     /* read topology file */
+#endif
 
   global_masses = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
   global_charges = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
@@ -3795,22 +3849,18 @@ geometry[0]=geometry[1];
  
   get_index(&top->atoms,ftp2fn_null(efNDX,NFILE,fnm),ngrps,ngx,index,grpname); 
   for(i=0;i<64;i++) com_opt[i]=0;
-
+  if (ngrps>=64) exit(printf("Error, too many groups\n"));
   if(bCom) { 
      FILE* comfile;
      char comstr[1024],*pchar;
      int iter=0;
-     comfile=fopen("masscom.dat","r");
-     if(comfile==NULL) exit(printf("Error: file masscom.dat not found\n"));
-     fgets(comstr,1024,comfile);
-     pchar = strtok(comstr," ") ;
-     while (pchar!=NULL ){
-           printf("\nhere %s\n",pchar);
-           com_opt[iter]=atoi(pchar) ; 
-           iter++;
-           pchar = strtok(NULL, " ");
+     printf("Enter the number of atoms per molecule for each of the following groups.\n");
+     for (i=0;i<ngrps;i++){
+	printf("group %d: ",i);
+	scanf("%d",&com_opt[i]);
      }
-  }
+  } 
+
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
     if(geometry[0][0]!='p' && bMCnormalization!=TRUE) { 
@@ -3845,6 +3895,5 @@ geometry[0]=geometry[1];
 	       bSymmetrize,oenv,histo_histo->iterations);
 #endif
   do_view(oenv,opt2fn("-o",NFILE,fnm), "-nxy");       /* view xvgr file */
-  thanx(stderr);
   return 0;
 }
