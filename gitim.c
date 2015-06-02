@@ -34,9 +34,11 @@
  */
 //// TODO: fix these includes 
 // #if GMX_VERSION>=50000
+
 #define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c))
 #define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(e),(f))
 #include "gmxpre.h"
+#include <gsl/gsl_multimin.h>
 
 #include <ctype.h>
 #include <math.h>
@@ -92,6 +94,19 @@
 #include "tpxio.h"
 //#include "physics.h"
 #include "gmx_ana.h"
+
+
+#include <stdio.h>
+#include <math.h>
+#ifdef ALPHA
+extern "C" {
+#include <qhull_tools.h>
+}
+#endif
+#include <sys/time.h>
+#define HISTO_N 100
+
+
 #define NORMAL_UNDEFINED -100
 typedef	enum { SUPPORT_PHASE=0, INNER_PHASE=1, OUTER_PHASE=2, RANDOM_PHASE=3 } PHASE; // These value are not arbitrary and should not be changed.
  /* These value are not arbitrary and should not be changed: 
@@ -104,6 +119,13 @@ typedef	enum { OFF_NUMBER=4, OFF_ORDER1=7, OFF_ORDER1_2=10, OFF_ORDER2=13,  OFF_
 typedef enum {SURFACE_PLANE, SURFACE_SPHERE, SURFACE_CYLINDER, SURFACE_GENERIC } GEOMETRY;
 typedef	enum { NONE, PATCH, FULL} PERIODIC ; 
 typedef	enum { METHOD_ITIM, METHOD_A_SHAPE} METHOD; 
+
+typedef struct { 
+  rvec *x0;
+  matrix box;
+  int ePBC;
+  int nr;
+} t_minimize_com2;
 
 typedef struct {
 	struct kdtree * tree;
@@ -1031,13 +1053,6 @@ static void clear_results(struct kdres *rset)
 
 
 /* NOTE: alpha shape code adapted from meshlab */
-#include <stdio.h>
-#include <math.h>
-#ifdef ALPHA
-#include <qhull_tools.h>
-#endif
-#include <sys/time.h>
-#define HISTO_N 100
 
 #define SQR(x) ((x)*(x))
 
@@ -3253,7 +3268,7 @@ int get_electrons(t_electron **eltab, const char *fn)
   return nr;
 }
 
-void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
+void remove_phase_pbc_old(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
      /*we assume here that atoms have been already put into the box */
      /* compute the density at different control points: box edges, middle + some more */
      int rho[5],rho_max,i,nbins=25; 
@@ -3289,11 +3304,160 @@ void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, 
     }
 }
 
-void center_coords(t_atoms *atoms,matrix box,rvec x0[],int axis,atom_id *index, int index_nr)
+double
+minimize_com2 (const gsl_vector *v, void *params)
+{
+  rvec *x0 = ((t_minimize_com2 *) params)->x0;
+  static rvec *x1 = NULL;
+  static int *grid = NULL;
+  matrix box ;
+  for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j]=((t_minimize_com2 *) params)->box[i][j];
+  int ePBC = ((t_minimize_com2 *) params)->ePBC;
+  int nr = ((t_minimize_com2 *) params)->nr;
+  int i,ix,iy,iz;
+  double r2=0.;
+  double x,y,z;
+  int dd=5;
+  if(x1==NULL) x1=(rvec*)malloc(nr*sizeof(rvec));
+  if(grid==NULL) grid=(int*)malloc(dd*dd*dd*sizeof(rvec));
+  if(params==NULL) { if(x1!=NULL)free(x1); return 0.0; } 
+  for(i=0;i<nr;i++) copy_rvec(x0[i],x1[i]) ;
+  for(i=0;i<dd*dd*dd;i++) grid[i]=0;
+
+  x = gsl_vector_get(v, 0);
+  y = gsl_vector_get(v, 1);
+  z = gsl_vector_get(v, 2);
+
+  for(i=0;i<nr;i++){
+	x1[i][0]+=x;
+	x1[i][1]+=y;
+	x1[i][2]+=z;
+  } 
+  put_atoms_in_box(ePBC,box,nr,x1);
+  for(i=0;i<nr;i++){
+	 ix = (int) floor(x1[i][0]*dd*1.0/box[0][0]);
+	 iy = (int) floor(x1[i][1]*dd*1.0/box[1][1]);
+	 iz = (int) floor(x1[i][2]*dd*1.0/box[2][2]);
+         if(grid[ix+iy*dd+iz*dd*dd]==0){
+         	 grid[ix+iy*dd+iz*dd*dd]=1;
+		 r2+=ix*ix+iy*iy+iz*iz;
+	 }
+  }
+  printf("r2=%f\n",r2);
+  return r2;  
+}
+
+void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr, int bInverse){
+     /*we assume here that atoms have been already put into the box */
+     /* compute the density at different control points: box edges, middle + some more */
+     t_minimize_com2 par;
+     int rho[5],rho_max,i,nbins=25; 
+     static real shift=0.0;
+     real bWidth ;
+     static real x=0.;
+     static real y=0.;
+     static real z=0.;
+     int sign = 1-2*bInverse;
+  // TODO: check: this does not work with a solid ... bin must bigger than average interparticle z distance...
+     bWidth = box[axis][axis]/nbins;
+     const gsl_multimin_fminimizer_type *T =  gsl_multimin_fminimizer_nmsimplex2;
+     gsl_multimin_fminimizer *s = NULL;
+     gsl_vector *ss, *v;
+     gsl_multimin_function minex_func;
+
+     size_t iter = 0;
+     int status;
+     double size;
+     minex_func.n = 3;
+     minex_func.f = minimize_com2;
+     par.x0=x0;
+     for(int i=0;i<3;i++) for(int j=0;j<3;j++) par.box[i][j]=box[i][j];
+     par.ePBC=ePBC;
+     par.nr=atoms->nr;
+     minex_func.params = (void*)(&par);
+
+
+  /* Starting point */
+     v = gsl_vector_alloc (3);
+     gsl_vector_set (v, 0, x);
+     gsl_vector_set (v, 1, y);
+     gsl_vector_set (v, 2, z);
+
+  /* Set initial step sizes to 1 */
+     ss = gsl_vector_alloc (3);
+     gsl_vector_set_all (ss, 0.1);
+
+     s = gsl_multimin_fminimizer_alloc (T, 3);
+     gsl_multimin_fminimizer_set (s, &minex_func, v, ss);
+
+  do {
+      iter++;
+      status = gsl_multimin_fminimizer_iterate(s);
+      if (status) 
+        break;
+      size = gsl_multimin_fminimizer_size (s);
+      status = gsl_multimin_test_size (size, 2e-2);
+      if (status == GSL_SUCCESS)
+        {
+	printf("....\n");
+          printf ("atoms shifted to ");
+
+      printf ("%.3f %.3f %.3f\n",
+              gsl_vector_get (s->x, 0), 
+              gsl_vector_get (s->x, 1), 
+              gsl_vector_get (s->x, 2)); 
+
+        }
+  } while (status == GSL_CONTINUE && iter < 100);
+  x=gsl_vector_get (s->x, 0);
+  y=gsl_vector_get (s->x, 1);
+  z=gsl_vector_get (s->x, 2);
+  for(i=0; (i<atoms->nr); i++) {
+	x0[i][0]+=x;
+	x0[i][1]+=y;
+	x0[i][2]+=z;
+  } 
+  put_atoms_in_box(ePBC,box,atoms->nr,x0);
+
+#if 0
+     while (1){ 
+	 if(shift!=0.0){
+     	   for(i=0; (i<atoms->nr); i++) {
+	   	x0[i][axis]+=shift;
+	   }
+	   put_atoms_in_box(ePBC,box,atoms->nr,x0);
+         }
+	 shift=0.0;
+         rho[0]=rho[1]=rho[2]=rho[3]=rho[4]=0;
+         for(i=0; (i<index_nr); i++) {
+             z=x0[index[i]][axis];
+             if(z<bWidth) rho[0]++; 
+             else if (z>box[axis][axis]-bWidth) rho[4]++;
+             else if (z>(nbins/2)*bWidth && z < (nbins/2+1)*bWidth) rho[2]++;
+             else if (z>(nbins/4)*bWidth &&  z < (nbins/4+1)*bWidth) rho[1]++;
+             else if (z>(3*nbins/4)*bWidth && z < (3*nbins/4+1)*bWidth) rho[3]++;
+
+         }
+	printf("rho0=%d\n",rho[0]);
+         for(rho_max=rho[0],i=1; i<5;i++) if (rho[i]>rho_max) rho_max=rho[i];
+	 printf("%f >< %f   ||   %f >< %f\n",(real)(sign*rho[0]),(real)(sign*rho_max/4), (real)(sign*rho[4]),(real)(sign*rho_max/4));
+	 printf("%f %f  %f %f %f\n",rho[0],rho[1],rho[2],rho[3],rho[4]);
+         if(sign*rho[0] > sign*rho_max/4 || sign*rho[4] > sign*rho_max/4) { /* careful: not >= otherwise the algorithm doesn't 
+									       work when rho=0 in all sampled regions */
+            	shift+=bWidth*rand()/RAND_MAX;
+		fprintf(stderr,"Trying to shift the box by %f nm in direction %s\n",shift,axis==0?'X':(axis==1?'Y':'Z'));
+		if(shift>box[axis][axis]) exit(printf("Error: it was not possible to center the phase in the box\n"));
+         } else return ;
+    }
+#endif
+}
+
+void center_coords(t_atoms *atoms,matrix box,rvec x0[],int axis,atom_id *index, int index_nr, int bInverse)
 {
   int  i,m;
   real tmass,mm;
   rvec com,shift,box_center;
+  int sign = 1-2*bInverse;
   
   tmass = 0;
   clear_rvec(com);
@@ -3315,7 +3479,7 @@ void center_coords(t_atoms *atoms,matrix box,rvec x0[],int axis,atom_id *index, 
             }
   }
   for(m=0; (m<DIM); m++) 
-    com[m] /= tmass;
+    com[m] /= sign*tmass;
   calc_box_center(ecenterDEF,box,box_center);
   rvec_sub(box_center,com,shift);
   
@@ -3387,7 +3551,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
     gmx_rmpbc(gpbc,natoms,box,x0);
 
     if (bCenter)
-      center_coords(&top->atoms,box,x0,axis,NULL,0);
+      center_coords(&top->atoms,box,x0,axis,NULL,0,0);
     
     *slWidth = box[axis][axis]/(*nslices);
     for (n = 0; n < nr_grps; n++) {      
@@ -3493,7 +3657,7 @@ void calc_density(const char *fn, atom_id **index, int gnx[],
     gmx_rmpbc(gpbc,natoms,box,x0);
 
     if (bCenter)
-      center_coords(&top->atoms,box,x0,axis,NULL,0);
+      center_coords(&top->atoms,box,x0,axis,NULL,0,0);
     
     *slWidth = box[axis][axis]/(*nslices);
     teller++;
@@ -3644,7 +3808,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		  real ***slDensity, int *nslices, t_topology *top, int ePBC,
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
                   real alpha,int *com_opt, int bOrder, const char ** geometry, 
-                  int bDump,int bCenter,int bMCnormalization,char dens_opt){
+                  int bDump,int bCenter,int bMCnormalization,char dens_opt,int bInverse){
 	enum {NO_ADDITIONAL_INFO=0,ADDITIONAL_INFO=1};
 	ITIM * itim;
 	real * radii;
@@ -3679,11 +3843,15 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
                 if(bCenter){
 		    put_atoms_in_box(ePBC,box,natoms,x0);
 	            /* Make our reference phase whole */
-		    remove_phase_pbc(ePBC,&top->atoms,box, x0, axis, index[0], gnx[0]);
+		    switch(itim->geometry){ 
+		    	case SURFACE_PLANE: remove_phase_pbc(ePBC,&top->atoms,box, x0, axis, index[1], gnx[0],bInverse); break;
+		    	case SURFACE_SPHERE: remove_phase_pbc(ePBC,&top->atoms,box, x0, 0, index[0], gnx[1],bInverse); break;
+			default: exit(printf("Geometry centering not supported, contact the developer!"));
+		    }
                 }
 		/* Now center the com of the reference phase in the middle of the box (the one from -box/2 to box/2, 
                    not the gromacs std one:), and shift/rebox the rest accordingly */
-      		center_coords(&top->atoms,box,x0,axis,index[0],gnx[0]);
+      		center_coords(&top->atoms,box,x0,axis,index[0],gnx[0],bInverse);
                 /* Identify the atom,tops belonging to the intrinsic surface */
 	        compute_intrinsic_surface(box, nr_grps, x0, gnx, index,top);
 		if(bDump){
@@ -3744,6 +3912,7 @@ int main(int argc,char *argv[])
   int bMCnormalization=TRUE; 
   char com_opt_file[1024];
   static gmx_bool bCenter=TRUE;
+  static gmx_bool bInverse=FALSE;
   static gmx_bool bIntrinsic=FALSE;
   static gmx_bool bDump=FALSE;
   static gmx_bool bOrder=FALSE;
@@ -3760,6 +3929,8 @@ int main(int argc,char *argv[])
       "Number of groups to compute densities of" },
     { "-center",  TRUE, etBOOL, {&bCenter},
       "Shift the center of mass along the axis to zero. This means if your axis is Z and your box is bX, bY, bZ, the center of mass will be at bX/2, bY/2, 0."},
+    { "-inverse",  TRUE, etBOOL, {&bInverse},
+      "Center the void instead of the phase"},
     { "-intrinsic", FALSE, etBOOL, {&bIntrinsic}, 
       "Perform intrinsic analysis (needs at least one reference group and on group for the density calculation)" },
     { "-alpha", FALSE, etREAL, {&alpha}, 
@@ -3871,7 +4042,7 @@ geometry[0]=geometry[1];
 	        bCenter=TRUE;
 		printf("Switching on -center");
     }
-    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,geometry,bDump,bCenter,bMCnormalization,dens_opt[0][0]);
+    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,geometry,bDump,bCenter,bMCnormalization,dens_opt[0][0],bInverse);
   } else { 	
     if (dens_opt[0][0] == 'e') {
       nr_electrons =  get_electrons(&el_tab,ftp2fn(efDAT,NFILE,fnm));
