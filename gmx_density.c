@@ -71,7 +71,12 @@ NOTE: how to acess atom properties
 #include "tpxio.h"
 #include "gmx_ana.h"
 #include <nbsearch.h>
-
+#ifdef UNIX  
+// used for handling signals
+#include<stdio.h>
+#include<signal.h>
+#include<unistd.h>
+#endif //UNIX
 
 #define gmx_ffopen ffopen
 #define gmx_ffclose ffclose
@@ -122,6 +127,9 @@ NOTE: how to acess atom properties
 #endif
 
 #define NORMAL_UNDEFINED -100
+
+int global_interrupt = 0;
+
 typedef	enum { SUPPORT_PHASE=0, INNER_PHASE=1, OUTER_PHASE=2 } PHASE; // These value are not arbitrary and should not be changed.
  /* These value are not arbitrary and should not be changed: 
       OFF_NUMBER    -> for number density profile, used to normalize the order parameter density profile as well.
@@ -185,8 +193,11 @@ typedef struct {
 	int * gmx_alpha_id;
 	int * gmx_alpha_phase_id;
 	int ** gmx_index;
+	int *indexm; // for the molecular version of the support group.
+	int *backindex; // for the molecular version of the support group.
 	int com_opt[64];
         int bCom;
+        int bMol;
         int bInclusive;
         int bMCnormalization;
         int bOrder;
@@ -332,7 +343,6 @@ struct kdnode {
 	real *pos;
 	int dir;
 	real *data;
-
 	struct kdnode *left, *right;	/* negative/positive side */
 };
 
@@ -1122,12 +1132,13 @@ real * global_charges=NULL;
 #ifdef INTEGER_HISTO
 unsigned long long int * int_histo;
 #endif
-ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins, int maxlayers,real * radii, int ** index, int *gnx,int *com_opt, int bOrder, int bInclusive, int dump_mol, int bMCnormalization, const char ** geometry, int ngrps_add);
+ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins, int maxlayers,real * radii, int ** index, int *gnx,int *com_opt, int bOrder, int bInclusive, int dump_mol, int bMCnormalization, const char ** geometry, int ngrps_add, int bMol, t_topology * top);
 
 
 void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top, char dens_opt, t_trxframe * fr);
 void  compute_intrinsic_order(matrix box, atom_id **index, t_topology * top);
 void  finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth);
+void  free_profile(real *** density);
 
 
 int add_histo(Histogram * histo, int N, double pos, double value){
@@ -1180,6 +1191,8 @@ int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int lin
         for(n=SUPPORT_PHASE+1;n<itim->nphases;n++){ // one (intrinsic) histogram for each of the other phases
             	if(molecular == ATOMIC && phase==n && TYPE==INTRINSIC_DENSITY) return index;
             	index++;
+            	if(molecular == ATOMIC && phase==n && TYPE==LAYER_DISTRIBUTION) return index;
+            	index++;
         }
         if (TYPE==INTRINSIC_ORDER) {
                 exit(printf("Internal error: order profiles to be checked\n"));
@@ -1223,6 +1236,7 @@ void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn, 
    }
 
    for(n=SUPPORT_PHASE+1;n<nphases;n++){
+     fprintf(cid,"#column %d : %s distribution %s\n",column,modif[ATOMIC],grpmname[n]); column++;
      fprintf(cid,"#column %d : %s density %s\n",column,modif[ATOMIC],grpmname[n]); column++;
      fflush(cid);
    }
@@ -1327,6 +1341,7 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	}
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
 	       atom_index = itim->gmx_index[SUPPORT_PHASE][i];
+               double m = itim->masses[atom_index];
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
@@ -1334,9 +1349,9 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
                  f[3*layer]   += fr->f[atom_index][0];
                  f[3*layer+1] += fr->f[atom_index][1];
                  f[3*layer+2] += fr->f[atom_index][2];
-                 vir[3*layer]   += fr->vir[atom_index][0];
-                 vir[3*layer+1] += fr->vir[atom_index][1];
-                 vir[3*layer+2] += fr->vir[atom_index][2];
+                 vir[3*layer]   +=  fr->vir[atom_index][0];
+                 vir[3*layer+1] +=  fr->vir[atom_index][1];
+                 vir[3*layer+2] +=  fr->vir[atom_index][2];
 #endif
                }
         }
@@ -1366,7 +1381,7 @@ void init_itim_grid(ITIM * itim){
    	  itim->mesh.size[i] = itim->box[i]/itim->mesh.n[i];
 	}
 	itim->mesh.nelem = itim->mesh.n[0]*itim->mesh.n[1];
-        itim->mesh.flag = (int *) malloc (itim->mesh.nelem * sizeof(int));
+        itim->mesh.flag = (int *) realloc (itim->mesh.flag,itim->mesh.nelem * sizeof(int));
 	if( itim->mesh.tree != NULL) {
 			kd_free( itim->mesh.tree);
 			itim->mesh.tree=NULL;
@@ -1439,7 +1454,17 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 		if (is_in_correct_phase(index)) { // in  main cluster, layer not yet assigned
 		
 			itim->mask[index]=itim->current_layer;
-
+			if(itim->bMol) {  // let's add all other atoms in the molecule to the layer.
+				int mol = itim->indexm[gmx_index_phase[SUPPORT_PHASE][index]];
+                                //printf("mol %d phaseid %d  atomid %d (max = %d)\n",mol, index,gmx_index_phase[SUPPORT_PHASE][index],itim->n[SUPPORT_PHASE]);
+			        int i1 = itim->backindex[mol];	
+			        int i2 = itim->backindex[mol+1];	
+				int k ; 
+				for(k=i1;k<i2;k++){
+					itim->mask[k] = itim->current_layer;
+				}
+				
+			}
 			if(itim->current_layer==1) { 
 		          itim->alpha_index[itim->nalphapoints] = index;
 			  if(itim->alphapoints==NULL) exit(printf("Error reallocating alphapoints\n"));
@@ -1494,6 +1519,7 @@ int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM 
 		counter ++;
 		if(counter == itim->mesh.nelem) {
                        /* Now all the testline have been associated to molecules, and have therefore all been flipped */
+		      kd_res_free( presults );
                       counter = 0 ;  return 0 ;
                 }
 	  }
@@ -1510,8 +1536,8 @@ int check_itim_testlines_periodic(Direction face, int index, real * pos,real sig
 	real periodic[2];
 	real border_positive[2];
 	real border_negative[2];
-	border_positive[0]=itim->box[0]/2.  - sigma - itim->alpha ;
-	border_positive[1]=itim->box[1]/2.  - sigma - itim->alpha ;
+	border_positive[0]=itim->box[0]/2. - sigma - itim->alpha ;
+	border_positive[1]=itim->box[1]/2. - sigma - itim->alpha ;
 	border_negative[0]=-itim->box[0]/2. + sigma + itim->alpha ;
 	border_negative[1]=-itim->box[1]/2. + sigma + itim->alpha ;
 
@@ -1617,7 +1643,7 @@ int projection(const void * a, const void * b) {
 }
 
 // TODO !! NOTE: this allows only computation of surface molecules of the SUPPORT_PHASE
-void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0,int * mask){
+int compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0,int * mask){
 	int i=0,index,result;
 #ifdef TIME_PROFILE
         struct timeval tp;
@@ -1639,7 +1665,7 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
 			result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
 		}
           	i++ ; 
-		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE])); }
+		if(i>=itim->n[SUPPORT_PHASE]) {printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE]); return 0; }
 	} while (result) ;
 	printf("scanned %d parts\n",i);
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
@@ -1653,11 +1679,11 @@ void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase
 			result = check_itim_testlines_periodic(DIR_NEGATIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
 		}
           	i++; 
-		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the negative side...\n",itim->n[SUPPORT_PHASE])); }
+		if(i>=itim->n[SUPPORT_PHASE]) {printf("Error: all (%d) particles scanned, but did not associate all testlines on the negative side...\n",itim->n[SUPPORT_PHASE]); return 0; }
 	} while (result) ;
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
-
+	return 1;
 }
 
 
@@ -1793,6 +1819,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
 		/* p1 */
 		presults = kd_nearest_range( Surface, P,0.6+global_itim->alpha); 
+		if(kd_res_end(presults)){  exit(printf("Did not find any neighbor on the surface, exiting...\n")); }
 		zpos    = (real*) kd_res_item(presults, p1); 
 		if(kd_res_end(presults)) exit(printf("Error, no projected surface point found\n"));
 		p1[2]=*zpos;
@@ -1888,12 +1915,13 @@ void dump_slabs(t_topology* top, int dump_mol){
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
 	       		
 	        int mol,i1,i2;
+		real dist;
 	        phase_index= i ; 
 		real normal[3];
 	        atom_index = itim->gmx_index[SUPPORT_PHASE][phase_index];
 
 	        
-		real dist = perform_interpolation(Surface, &(itim->phase[SUPPORT_PHASE][3*i]), &(normal[0]),itim,i,SUPPORT_PHASE);
+		dist = perform_interpolation(Surface, &(itim->phase[SUPPORT_PHASE][3*i]), &(normal[0]),itim,i,SUPPORT_PHASE);
 	        if (dump_mol){
 			int minlayer = 100000;
 			int k;
@@ -2035,6 +2063,7 @@ void init_itim(int nphases,int nadd_index) {
 	if(itim->masses==NULL) exit(printf("Internal error, itim->masses not allocated\n"));
 	itim->mesh.nelem=0;
 	itim->mesh.tree=NULL;
+	itim->mesh.flag=NULL;
 	itim->nphases = nphases;
 	itim->RANDOM_PHASE= nphases-1;
         itim->current_layer = 1;
@@ -2070,6 +2099,7 @@ void init_itim(int nphases,int nadd_index) {
 	itim->dump_surface_points=dump_surface_points;
 	itim->dump_surface_molecules=dump_surface_molecules;
 	itim->dump_phase_points=dump_phase_points;
+        
 }
 
 void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** mask, int *nindex, int ** gmx_index_phase, matrix box, int  ng, int natoms, t_pbc pbc){
@@ -2084,17 +2114,6 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
 	int nclusters=-1;
 	int   totsize, * incsize;
 
-    	snew(cluster_size,  	ng);
-    	snew(cluster_map,   	ng);
-    	snew(cluster_index, 	ng);
-    	snew(cluster_analyzed,  ng);
-        for(int phase=SUPPORT_PHASE; phase < ng; phase++) { 
-    		snew(cluster_size[phase], nindex[phase]);
-    		snew(cluster_map[phase], nindex[phase]);
-    		snew(cluster_analyzed[phase],nindex[phase]);
-    		snew(cluster_index[phase],nindex[phase]);
-	}
-	totsize=0;
 	incsize = (int*) malloc(sizeof(int)*ng);
 	for(int g=0;g<ng;g++){
 		incsize[g]=totsize;
@@ -2106,10 +2125,24 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
 	if(!bCluster){
 	      // by default, use all atoms;
              for(int atom=0 ; atom <  totsize ; atom++) (*mask)[atom]=0;
+	     free(incsize);
              return ;
         } else {
              for(int atom=0 ; atom <  totsize ; atom++) (*mask)[atom]=-1;
         }
+
+
+    	snew(cluster_size,  	ng);
+    	snew(cluster_map,   	ng);
+    	snew(cluster_index, 	ng);
+    	snew(cluster_analyzed,  ng);
+        for(int phase=SUPPORT_PHASE; phase < ng; phase++) { 
+    		snew(cluster_size[phase], nindex[phase]);
+    		snew(cluster_map[phase], nindex[phase]);
+    		snew(cluster_analyzed[phase],nindex[phase]);
+    		snew(cluster_index[phase],nindex[phase]);
+	}
+	totsize=0;
         for (int g = 0; g < ng; g++)
         {
 		if(bInclusive && g==0 ) continue; /* we don't need it, we'll copy the info in reinit_mask() */ 
@@ -2227,7 +2260,7 @@ void arrange_datapoints( ITIM *itim, rvec * gmx_coords, int *nindex, int ** gmx_
 	int phase;
         for(phase=(int)SUPPORT_PHASE; phase < itim->ngmxphases ; phase++) { 
           /* at the first iteration, itim->n are all zero  (initialized by init_itim() )*/
-	  
+
           if(itim->n[phase]<nindex[phase]) { 
                 itim->n[phase]=nindex[phase];
                 itim->phase[phase] = (real * ) realloc(itim->phase[phase],itim->n[phase]*sizeof(real) * 3);
@@ -2400,7 +2433,7 @@ void check_inclusive_conditions(atom_id ** index, int *gnx){
 
 
 
-ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int bOrder, int bInclusive, int dump_mol, int bMCnormalization , const char ** geometry, int ngrps_add){
+ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int bOrder, int bInclusive, int dump_mol, int bMCnormalization , const char ** geometry, int ngrps_add, int bMol, t_topology * top){
 	    ITIM * itim;
 	    int i;
             int histofactor=1;
@@ -2411,6 +2444,7 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
 	    itim->nadd_index =  ngrps_add;
 	    itim->maxlayers = maxlayers;
      	    itim->method = METHOD_ITIM;
+            itim->bMol=bMol;
             itim->bOrder=bOrder;
             itim->bInclusive=bInclusive;
             itim->bMCnormalization=bMCnormalization;
@@ -2444,6 +2478,18 @@ ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, in
 		itim->radii[i] = radii[gmx_index[SUPPORT_PHASE][i]];
 	    }
             itim->gmx_index = gmx_index;
+	    if(itim->bMol) {  // TODO: check if some of the other spol_atom2molindex() calls can be replaced by referencing this index here...
+		int isizem=gnx[SUPPORT_PHASE];  
+		itim->indexm = (int*) malloc(isizem*sizeof(int));
+		itim->backindex= (int*) malloc((top->mols.nr+1)*sizeof(int));
+		for(i=0;i<gnx[SUPPORT_PHASE];i++) itim->indexm[i]=itim->gmx_index[SUPPORT_PHASE][i]; // NOTE: TODO check "additional"  under the PATCH case
+                spol_atom2molindex(&isizem, itim->indexm,itim->backindex, &(top->mols));
+	   //     printf(" === %d === \n",gnx[SUPPORT_PHASE]);
+           //     for(i=0;i<gnx[SUPPORT_PHASE];i++) { 
+	//		printf("atom %d: mol %d\n ",i,itim->indexm[i]);
+//		}
+//		exit(0); SAW REMOVE ME
+            }
 	    return itim;
 }
 
@@ -2506,11 +2552,12 @@ void finalize_intrinsic_profile(real *** density, int * nslices, real * slWidth)
              }
   	}
 }
-void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_coords, int *nindex, atom_id ** gmx_index_phase,t_topology * top, int natoms, t_pbc pbc){
+int compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_coords, int *nindex, atom_id ** gmx_index_phase,t_topology * top, int natoms, t_pbc pbc){
 	
 	ITIM * itim = global_itim;
 	int ind=itim->normal;
         static int * mask=NULL;
+	int success=1;
 #ifdef TIME_PROFILE
         struct timeval tp;
         struct timeval tp2;
@@ -2536,7 +2583,7 @@ void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_
 	              arrange_datapoints(itim, gmx_coords, nindex,  (int**)gmx_index_phase,mask);
                       reinit_mask(itim);
 		      for(itim->current_layer = 1 ; itim->current_layer <= itim->maxlayers  ; itim->current_layer ++){
-		      	compute_itim_points(DIR_POSITIVE,itim,(int**)gmx_index_phase,top,gmx_coords,mask);
+		      	success *= compute_itim_points(DIR_POSITIVE,itim,(int**)gmx_index_phase,top,gmx_coords,mask);
 		      }
 		      kd_free(itim->mesh.tree); itim->mesh.tree=NULL;
 		break;
@@ -2547,8 +2594,17 @@ void  compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_
         gettimeofday(&tp2, NULL);
         fprintf(stdout,"Time to build surface (method: %s): millisec=%f\n",itim->method_name[itim->method],1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
 #endif
+	if (success==0) {
+	   // reset all lines and return 0, the calling function should decide what to do in this case
+           // TODO BUG: this still does not fix the problem, after one "wrong" frame identification keeps failing
+	   for(int i=0;i<itim->mesh.nelem;i++){
+             	itim->mesh.flag[i]=DIR_POSITIVE;   
+           }
+	   return 0;
+        }
         arrange_alpha_points (itim,(int**)gmx_index_phase,top,gmx_coords); 
 	if(itim->info)fprintf(stdout,"Number of surface elements = %d\n",itim->nalphapoints);
+	return 1;
 }
 
 void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt, t_trxframe * fr){  
@@ -2567,10 +2623,19 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 					case 'c': value = top->atoms.atom[ itim->gmx_alpha_id[i] ].q; break;
 					case 'n': value = 1; break;
 #ifdef VIRIAL_EXTENSION
-					case 'v': 
+					case 't': 
 						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (0.5 * (tmprvec[0]+tmprvec[1]) - tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
+						value = (-0.5 * (tmprvec[0]+tmprvec[1])) / tmpreal;  
+						break;
+					case 'E': 
+						tmpreal = fr->pener[itim->gmx_alpha_id[i]];
+						value  = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
+						break;
+					case 'p': 
+						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
+						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
+						value = ( tmprvec[2]) / tmpreal; 
 						break;
 #endif
 					default : value =1 ; break;
@@ -2606,6 +2671,7 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
              break;
         }
 }
+
 void compute_histogram(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt, t_trxframe * fr){  
 /*************************************
 
@@ -2655,13 +2721,15 @@ This is too cluttered. Reorganize the code...
     if(2*size<histo->minsize) histo->minsize=2*size;
     histo->iterations++;
     for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
+
+        if(j==itim->RANDOM_PHASE && !itim->bMCnormalization) continue;
+
 	int isizem, *indexm,*backindex;
 	int molecular_layer,atomic_layer;
 	isizem=itim->n[j];
 	snew(indexm,isizem);
 	snew(backindex,top->mols.nr+1);
 
-        if(j==itim->RANDOM_PHASE && !itim->bMCnormalization) continue;
 
 	if(!(j==itim->RANDOM_PHASE && itim->bMCnormalization)) {
 		for(i=0;i<itim->n[j];i++) indexm[i]=itim->gmx_index[j][i]; // NOTE: TODO check "additional"  under the PATCH case
@@ -2733,10 +2801,19 @@ printf("n[%d]=%d\n",j,itim->n[j]);
 			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
 			    	case 'n': value = 1; break;
 #ifdef VIRIAL_EXTENSION
-			    	case 'v': 
+			    	case 't': 
 						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (0.5 * (tmprvec[0]+tmprvec[1]) - tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
+						value = (0.5 * (tmprvec[0]+tmprvec[1])) / tmpreal;  // TODO: other directions than z ...
+						break ; 
+			    	case 'E': 
+						tmpreal = fr->pener[gmx_index_phase[j][i]];
+						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
+						break ; 
+			    	case 'p': 
+						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
+						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
+						value = (tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
 						break ; 
 #endif
 			    	default : value =1 ; break;
@@ -2813,6 +2890,7 @@ printf("n[%d]=%d\n",j,itim->n[j]);
 			}
 		 } else { 
 		 	   sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,0,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
+		 	   sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,j,0,ATOMIC,__LINE__),p4[2], histo, itim,(real)(locmass));
 		 }
 #endif
                  //printf("SAMPLING %d %d %f %d\n",i,sampled,locmass,check+=locmass);
@@ -3220,7 +3298,9 @@ void plot_density(real *slDensity[], const char *afile, int nslices,
   case 'c': ylabel = "Charge density (e nm\\S-3\\N)"; break;
   case 'e': ylabel = "Electron density (e nm\\S-3\\N)"; break;
 #ifdef VIRIAL_EXTENSION
-  case 'v': ylabel = "Surface tension (kJ)"; break;
+  case 't': ylabel = "Surface tension density (bar)"; break;
+  case 'E': ylabel = "Energy density (kJ/mol  nm\\S-3\\N)"; break;
+  case 'p': ylabel = "Normal pressure density (bar)"; break;
 #endif
   case 's': return;
   }
@@ -3314,11 +3394,23 @@ void flip_atoms_in_box(int natoms, int normal,  rvec * x0){
 	}
 }
 
+#ifdef UNIX
+#warning compiling with signal support
+void sig_handler(int signo)
+{
+  if (signo == SIGINT) { 
+    printf("\n\n === Caught SIGINT, trying to terminate analysis and save all files...\n\n");
+    global_interrupt = 1 ;
+  }
+}
+#endif //UNIX
+
+
 void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		  real ***slDensity, int *nslices, int maxlayers, t_topology *top, int ePBC,
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
                   real alpha,int *com_opt, int bOrder, int bInclusive, const char ** geometry, 
-                  int bDump,int bDumpPhases,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt,int ngrps_add){
+                  int bDump,int bDumpPhases,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt,int ngrps_add, int bMol){
 	enum {NO_ADDITIONAL_INFO=0,ADDITIONAL_INFO=1};
 	ITIM * itim;
 	real * radii;
@@ -3335,16 +3427,17 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
     	t_trxframe     fr;
         t_trxstatus * status ;	
   	gmx_rmpbc_t  gpbc=NULL;
+	t_pbc  pbc;
 
 	radii = load_radii(top);
 //        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
 //          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
-	flags = TRX_READ_X |  TRX_READ_F ;
+	flags = TRX_READ_X | TRX_READ_V |  TRX_READ_F ;
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
           gmx_fatal(FARGS,"Error loading the trajectory\n");
 	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
 
-        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add); 
+        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add, bMol,top); 
 
 	if(bDump)
         	surf_cid=fopen("surf.gro","w"); // TODO: from command line, or at least switchable!
@@ -3369,13 +3462,18 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 
 	fclose(statfile);
 	if(bInclusive) check_inclusive_conditions(index, gnx);
+  	gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
+#ifdef UNIX
+		if (signal(SIGINT, sig_handler) == SIG_ERR) {
+			printf("Error handling SIGINT");
+			// sets global_interrupt to 1 when catching SIGINT
+		}
+#endif //UNIX
 		x0 = fr.x;	
         	natoms = fr.natoms;
 		for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
-  		gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
-		t_pbc pbc;
     		gmx_rmpbc(gpbc,natoms,box,x0);
         	set_pbc(&pbc, ePBC, box);
                 if(bCenter){
@@ -3395,27 +3493,32 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
       			center_coords(&top->atoms,box,x0,axis,index[1],gnx[1]);
                 }
                 /* Identify the atom,tops belonging to the intrinsic surface */
-	        compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
-		if(bDumpPhases) { 
-	            itim->dump_phase_points(INNER_PHASE,top,phase_cid);  // gh
-	            itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); // gh
-                }
-		if(bDump){
-	   	    dump_slabs(top,0); 
-	   	    //itim->dump_surface_points(top,surf_cid); 
-                    //if(itim->dump_mol)
-	   	       //itim->dump_surface_molecules(top,surfmol_cid,index); 
-		}
-                if(itim->dump_mol)  
-			dump_slabs(top,1);
-		/* Compute the intrinsic profile */
-	        if(dens_opt!='s') {  
-		   compute_layer_profile(box, index, top, dens_opt, & fr ); 
-		   collect_statistics_for_layers(itim,&fr);
- 		   compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
-                }
+	        int success = compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
+		printf("time=%.3f\n",fr.time);
+		if (!success && getenv("NO_IDENTIFICATION_ERROR")==NULL) exit(0);
+		if (success) { 
+		    if(bDumpPhases) { 
+	                itim->dump_phase_points(INNER_PHASE,top,phase_cid);  // gh
+	                itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); // gh
+                    }
+		    if(bDump){
+	   	        dump_slabs(top,0); 
+	   	        //itim->dump_surface_points(top,surf_cid); 
+                        //if(itim->dump_mol)
+	   	           //itim->dump_surface_molecules(top,surfmol_cid,index); 
+		    }
+                    if(itim->dump_mol)  
+		    	dump_slabs(top,1);
+		    /* Compute the intrinsic profile */
+	            if(dens_opt!='s') {  
+		       compute_layer_profile(box, index, top, dens_opt, & fr ); 
+		       collect_statistics_for_layers(itim,&fr);
+ 		       compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
+                    }
+		} else {printf("Skipping frame %f\n",fr.time);}
 
-  	} while (read_next_frame(oenv,status,&fr));
+  	} while (read_next_frame(oenv,status,&fr) &&  (global_interrupt == 0) );
+        gmx_rmpbc_done(gpbc);
 
         if(surf_cid  !=NULL)fclose(surf_cid);
         if(surfmol_cid!=NULL)fclose(surfmol_cid);
@@ -3432,7 +3535,15 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
              dump_int_histo(j,cid);
         }
 #endif
+	free_profile(slDensity);	
+}
 
+void free_profile(real *** density){
+	int i;
+	for(i=0;i<global_itim->n_histo;i++){
+	    free ((*density)[i]);
+        }
+	free(*density);
 }
 
 int gmx_density(int argc,char *argv[])
@@ -3455,7 +3566,7 @@ int gmx_density(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "virial",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy",  NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
@@ -3467,6 +3578,7 @@ int gmx_density(int argc,char *argv[])
   int com_opt[64];
   int dump_mol=0;
   int bCom=FALSE; 
+  int bMol=FALSE;
   int bMCnormalization=0; 
   char com_opt_file[1024];
   static gmx_bool bCenter=FALSE;
@@ -3509,6 +3621,8 @@ int gmx_density(int argc,char *argv[])
       "number of layers to analyze" },
     { "-MCnorm", FALSE, etBOOL, {&bMCnormalization}, 
       "automatic normalization using MC calculation for arbitrary coordinate systems" },
+    { "-mol", FALSE, etBOOL, {&bMol}, 
+      "Does molecule-based intrinsic analysis" },
     { "-com", FALSE, etBOOL, {&bCom}, 
       "with the -intrinsic option, perform a molecule-based intrinsic analysis. One should give to this flag the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." }
   };
@@ -3542,6 +3656,7 @@ int gmx_density(int argc,char *argv[])
   };
 
 geometry[0]=geometry[1];
+
 #define NFILE asize(fnm)
 if(0){
 real rad,p[3],q[3],r[3],s[3],wp,wq,wr,ws;
@@ -3627,7 +3742,7 @@ exit(0);
 
   if (bIntrinsic) { 
     if(ngrps<2) exit(printf("When using -intrinsic please specify at least two groups (can also be the same): the first will be used to compute the intrinsic surface, while the subsequent are used for the density profile calculation.\n"));
-    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0],ngrps_add);
+    calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,dens_opt[0][0],ngrps_add,bMol);
     plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm),dens_opt[0][0]);
 
   } else { 	

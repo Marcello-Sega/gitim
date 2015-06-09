@@ -4,6 +4,7 @@ INCLUDE (CheckIncludeFiles)
 set_source_files_properties(g_density.c PROPERTIES LANGUAGE CXX )
 set_source_files_properties(gmx_density.c PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
+<<<<<<< HEAD
 SET(ENVSRCDIR $ENV{MYGMX_SRC})
 SET(ENVBLDDIR $ENV{MYGMX_BUILD})
 if(NOT ENVSRCDIR)
@@ -12,13 +13,23 @@ if(NOT ENVSRCDIR)
 endif(NOT ENVSRCDIR)
 add_definitions(-pg)
 SET(CMAKE_EXE_LINKER_FLAGS "-pg")
+=======
+if (NOT MYGMX_SRC OR NOT MYGMX_BUILD)
+MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory. Pass them to cmake with -DMYGMX_SRC=..., etc.)")
+ENDIF(NOT MYGMX_SRC OR NOT MYGMX_BUILD)
+
+IF(${UNIX}) 
+ ADD_DEFINITIONS(-DUNIX)
+ENDIF(${UNIX})
+
+>>>>>>> fe8aa60688a6a944ce75a0201d5aa2a0a61948fe
 #IF(VIRIAL_EXTENSION)
 #	 add_definitions(-DVIRIAL_EXTENSION)
 #ENDIF(VIRIAL_EXTENSION)
 # these are possible locatsions of gromacs' distribution source / headers / libraries
 SET( GMX
-"$ENV{MYGMX_BUILD}/"
-"$ENV{MYGMX_SRC}/"
+"${MYGMX_BUILD}/"
+"${MYGMX_SRC}/"
 "/usr/include/"
 "/usr/lib/"
 "/usr/local/include/"
