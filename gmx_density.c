@@ -343,6 +343,7 @@ struct kdnode {
 	real *pos;
 	int dir;
 	real *data;
+
 	struct kdnode *left, *right;	/* negative/positive side */
 };
 
@@ -1817,8 +1818,8 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 		real * zpos;	
 
 		/* p1 */
-		presults = kd_nearest_range( Surface, P,0.6+global_itim->alpha); 
-		if(kd_res_end(presults)){  exit(printf("Did not find any neighbor on the surface, exiting...\n")); }
+		presults = kd_nearest_range( Surface, P,0.8+global_itim->alpha); 
+		if(kd_res_end(presults)){  printf("Did not find any neighbor on the surface, skipping...\n"); return 99.999;}
 		zpos    = (real*) kd_res_item(presults, p1); 
 		if(kd_res_end(presults)) exit(printf("Error, no projected surface point found\n"));
 		p1[2]=*zpos;
@@ -1833,7 +1834,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
                 do {
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){ if(NULL!=getenv("GITIM_WARNING")) fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
                 	kd_res_item(presults, p2); 
 
 			zpos    = (real*) kd_res_item(presults, p2); 
@@ -2631,6 +2632,11 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 						tmpreal = fr->pener[itim->gmx_alpha_id[i]];
 						value  = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
 						break;
+			    	case 'U': 
+						tmpreal = 0;
+						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
+						break ; 
+
 					case 'p': 
 						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
@@ -2806,6 +2812,12 @@ This is too cluttered. Reorganize the code...
 						break ; 
 			    	case 'E': 
 						tmpreal = fr->pener[gmx_index_phase[j][i]];
+						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
+						break ; 
+			    	case 'U': 
+						tmpreal = 0;
+						for(int ii=0;ii<itim->n[j];ii++)
+                                                       tmpreal+=fr->pener[gmx_index_phase[j][ii]];
 						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
 						break ; 
 			    	case 'p': 
@@ -3298,6 +3310,7 @@ void plot_density(real *slDensity[], const char *afile, int nslices,
 #ifdef VIRIAL_EXTENSION
   case 't': ylabel = "Surface tension density (bar)"; break;
   case 'E': ylabel = "Energy density (kJ/mol  nm\\S-3\\N)"; break;
+  case 'U': ylabel = "Total energy density (kJ/mol  nm\\S-3\\N)"; break;
   case 'p': ylabel = "Normal pressure density (bar)"; break;
 #endif
   case 's': return;
@@ -3564,7 +3577,7 @@ int gmx_density(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy", "U(total energy)",  NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
