@@ -1825,7 +1825,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 		p1[2]=*zpos;
 		while(p1[2]*P[2]<0){ /*i.e. they are on opposite sides, this can happen only with ITIM*/
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){ if(NULL!=getenv("GITIM_WARNING")) fprintf(stdout,"Warning: no suitable point for interpolation found \n"); return 99.999 ; }
 			zpos    = (real*) kd_res_item(presults, p1); 
 			p1[2]=*zpos;
 		}
@@ -1834,7 +1834,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
                 do {
 			kd_res_next( presults );
-			if(kd_res_end(presults)){ if(NULL!=getenv("GITIM_WARNING")) fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){ if(NULL!=getenv("GITIM_WARNING")) fprintf(stdout,"Warning: no suitable point for interpolation found \n"); return 99.999 ; }
                 	kd_res_item(presults, p2); 
 
 			zpos    = (real*) kd_res_item(presults, p2); 
@@ -2112,7 +2112,7 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
     	int        ** cluster_analyzed;
     	int        ** cluster_index;
 	int nclusters=-1;
-	int   totsize, * incsize;
+	int   totsize=0, * incsize;
 
 	incsize = (int*) malloc(sizeof(int)*ng);
 	for(int g=0;g<ng;g++){
@@ -2997,7 +2997,7 @@ int get_electrons(t_electron **eltab, const char *fn)
     if (sscanf(buffer, "%s = %d", tempname, &tempnr) != 2)
       gmx_fatal(FARGS,"Invalid line in datafile at line %d\n",i+1);
     (*eltab)[i].nr_el = tempnr;
-    sprintf((*eltab)[i].atomname ,tempname);
+    sprintf((*eltab)[i].atomname ,"%s",tempname);
   }
   gmx_ffclose(in);
   
@@ -3156,7 +3156,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
 	  /* determine which slice atom is in */
 	  slice = (z / (*slWidth)); 
 	  sought.nr_el = 0;
-	  sprintf(sought.atomname, *(top->atoms.atomname[index[n][i]]));
+	  sprintf(sought.atomname,"%s" ,*(top->atoms.atomname[index[n][i]]));
 
 	  /* now find the number of electrons. This is not efficient. */
 	  found = (t_electron *)
