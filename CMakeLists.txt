@@ -5,7 +5,7 @@ set_source_files_properties(g_density.c PROPERTIES LANGUAGE CXX )
 set_source_files_properties(gmx_density.c PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
 if (NOT MYGMX_SRC OR NOT MYGMX_BUILD)
-MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory. Pass them to cmake with -DMYGMX_SRC=..., etc.)")
+MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory (e.g. ~/gromacs-5.0/build/) . Pass them to cmake with -DMYGMX_SRC=..., etc. Note that if you compiled gromacs in the source directory, the two variable should point to the same directory.)")
 ENDIF(NOT MYGMX_SRC OR NOT MYGMX_BUILD)
 
 IF(${UNIX}) 
