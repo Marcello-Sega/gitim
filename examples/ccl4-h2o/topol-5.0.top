@@ -1,0 +1,10 @@
+#include "oplsaa.ff/forcefield.itp"
+#include "ccl4.itp"
+#include "oplsaa.ff/tip4p.itp"
+
+[ system ]
+water carbon tetrachloride mixture
+
+[ molecules ]
+SOL 9746
+CCl4 1566
