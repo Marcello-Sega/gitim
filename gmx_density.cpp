@@ -84,14 +84,18 @@ NOTE: how to acess atom properties
 #define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(d),(e),(f))
 
 #else
+
 #define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c))
 #define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(e),(f))
 #include "gmxpre.h"
+#include "gromacs/commandline/cmdlinemodulemanager.h"
+#include "gromacs/commandline/cmdlinehelpcontext.h"
 
 #include <ctype.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+
 
 #include "gromacs/commandline/pargs.h"
 #include "gromacs/fileio/tpxio.h"
@@ -109,6 +113,7 @@ NOTE: how to acess atom properties
 #include "gromacs/topology/index.h"
 #include "gromacs/utility/cstringutil.h"
 #include "gromacs/utility/fatalerror.h"
+#include "gromacs/utility/file.h"
 #include "gromacs/utility/futil.h"
 #include "gromacs/utility/smalloc.h"
 
@@ -343,6 +348,7 @@ struct kdnode {
 	real *pos;
 	int dir;
 	real *data;
+
 	struct kdnode *left, *right;	/* negative/positive side */
 };
 
@@ -1818,14 +1824,14 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 		real * zpos;	
 
 		/* p1 */
-		presults = kd_nearest_range( Surface, P,0.6+global_itim->alpha); 
-		if(kd_res_end(presults)){  exit(printf("Did not find any neighbor on the surface, exiting...\n")); }
+		presults = kd_nearest_range( Surface, P,0.8+global_itim->alpha); 
+		if(kd_res_end(presults)){  printf("Did not find any neighbor on the surface, skipping...\n"); return 99.999;}
 		zpos    = (real*) kd_res_item(presults, p1); 
 		if(kd_res_end(presults)) exit(printf("Error, no projected surface point found\n"));
 		p1[2]=*zpos;
 		while(p1[2]*P[2]<0){ /*i.e. they are on opposite sides, this can happen only with ITIM*/
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){ if(NULL!=getenv("GITIM_WARNING")) fprintf(stdout,"Warning: no suitable point for interpolation found \n"); return 99.999 ; }
 			zpos    = (real*) kd_res_item(presults, p1); 
 			p1[2]=*zpos;
 		}
@@ -1834,7 +1840,7 @@ real perform_interpolation( struct kdtree *Surface, real * P, real * normal, ITI
 
                 do {
 			kd_res_next( presults );
-			if(kd_res_end(presults)){  fprintf(stdout,"Warning: no suitable point for interpolation found (if this happens too often something is wrong)\n"); return 99.999 ; }
+			if(kd_res_end(presults)){ if(NULL!=getenv("GITIM_WARNING")) fprintf(stdout,"Warning: no suitable point for interpolation found \n"); return 99.999 ; }
                 	kd_res_item(presults, p2); 
 
 			zpos    = (real*) kd_res_item(presults, p2); 
@@ -2112,7 +2118,7 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
     	int        ** cluster_analyzed;
     	int        ** cluster_index;
 	int nclusters=-1;
-	int   totsize, * incsize;
+	int   totsize=0, * incsize;
 
 	incsize = (int*) malloc(sizeof(int)*ng);
 	for(int g=0;g<ng;g++){
@@ -2632,6 +2638,11 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
 						tmpreal = fr->pener[itim->gmx_alpha_id[i]];
 						value  = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
 						break;
+			    	case 'U': 
+						tmpreal = 0;
+						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
+						break ; 
+
 					case 'p': 
 						copy_rvec(fr->vir[itim->gmx_alpha_id[i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
@@ -2808,6 +2819,12 @@ printf("n[%d]=%d\n",j,itim->n[j]);
 						break ; 
 			    	case 'E': 
 						tmpreal = fr->pener[gmx_index_phase[j][i]];
+						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
+						break ; 
+			    	case 'U': 
+						tmpreal = 0;
+						for(int ii=0;ii<itim->n[j];ii++)
+                                                       tmpreal+=fr->pener[gmx_index_phase[j][ii]];
 						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
 						break ; 
 			    	case 'p': 
@@ -2987,7 +3004,7 @@ int get_electrons(t_electron **eltab, const char *fn)
     if (sscanf(buffer, "%s = %d", tempname, &tempnr) != 2)
       gmx_fatal(FARGS,"Invalid line in datafile at line %d\n",i+1);
     (*eltab)[i].nr_el = tempnr;
-    sprintf((*eltab)[i].atomname ,tempname);
+    sprintf((*eltab)[i].atomname ,"%s",tempname);
   }
   gmx_ffclose(in);
   
@@ -3146,7 +3163,7 @@ void calc_electron_density(const char *fn, atom_id **index, int gnx[],
 	  /* determine which slice atom is in */
 	  slice = (z / (*slWidth)); 
 	  sought.nr_el = 0;
-	  sprintf(sought.atomname, *(top->atoms.atomname[index[n][i]]));
+	  sprintf(sought.atomname,"%s" ,*(top->atoms.atomname[index[n][i]]));
 
 	  /* now find the number of electrons. This is not efficient. */
 	  found = (t_electron *)
@@ -3300,6 +3317,7 @@ void plot_density(real *slDensity[], const char *afile, int nslices,
 #ifdef VIRIAL_EXTENSION
   case 't': ylabel = "Surface tension density (bar)"; break;
   case 'E': ylabel = "Energy density (kJ/mol  nm\\S-3\\N)"; break;
+  case 'U': ylabel = "Total energy density (kJ/mol  nm\\S-3\\N)"; break;
   case 'p': ylabel = "Normal pressure density (bar)"; break;
 #endif
   case 's': return;
@@ -3566,7 +3584,7 @@ int gmx_density(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy", "U(total energy)",  NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
@@ -3588,6 +3606,7 @@ int gmx_density(int argc,char *argv[])
   static gmx_bool bDump=FALSE;
   static gmx_bool bDumpPhases=FALSE;
   static gmx_bool bOrder=FALSE;
+  static gmx_bool bHelp=FALSE;
   t_pargs pa[] = {
     { "-d", FALSE, etSTR, {&axtitle}, 
       "Take the normal on the membrane in direction X, Y or Z." },
@@ -3624,13 +3643,13 @@ int gmx_density(int argc,char *argv[])
     { "-mol", FALSE, etBOOL, {&bMol}, 
       "Does molecule-based intrinsic analysis" },
     { "-com", FALSE, etBOOL, {&bCom}, 
-      "with the -intrinsic option, perform a molecule-based intrinsic analysis. One should give to this flag the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." }
+      "with the -intrinsic option, perform a molecule-based intrinsic analysis. One should give to this flag the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." },
+#if GMX_VERSION >= 50000
+    { "-h", FALSE, etBOOL, {&bHelp},  "Print a help message" },
+#endif
+
   };
 
-  const char *bugs[] = {
-    "When calculating electron densities, atomnames are used instead of types. This is bad.",
-  };
-  
   real **density;        /* density per slice          */
   real slWidth;          /* width of one slice         */
   char **grpname;        /* groupnames                 */
@@ -3641,6 +3660,7 @@ int gmx_density(int argc,char *argv[])
   int  ePBC;
   atom_id   **index;     /* indices for all groups     */
   int  i;
+
 
   t_filenm  fnm[] = {    /* files for g_density 	  */
     { efTRX, "-f", NULL,  ffREAD },  
@@ -3658,32 +3678,19 @@ int gmx_density(int argc,char *argv[])
 geometry[0]=geometry[1];
 
 #define NFILE asize(fnm)
-if(0){
-real rad,p[3],q[3],r[3],s[3],wp,wq,wr,ws;
-printf("\n-=-=-=-=-=-=-=-=-=-\n");
-p[0]=-2.87242; p[1]= -1.21304  ; p[2]=1.66853;
-q[0]=-2.85356; q[1]= -0.788321 ; q[2]=1.46017;
-r[0]=-2.8576 ; r[1]=-0.571381  ; r[2]=2.01708;
-s[0]=-2.88333; s[1]= -1.255    ; s[2]=1.84003;
+#if GMX_VERSION >= 50000
+  for(int iarg=0; iarg < argc ; iarg ++ ) { // this is horrible, but couldn't get the hang of the new parse_common_args()
+	if(!strcmp(argv[iarg],"-h")){
+            gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL);
+            gmx::GlobalCommandLineHelpContext global(context);
+            gmx_bool res = parse_common_args(&argc,argv,0, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
+	    exit(0);   
+	}
+  }
+#endif
+  parse_common_args(&argc,argv,0, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
 
-/*
-p[0]= 1.;p[1]= 1.; p[2]= 1.;
-q[0]=-1.;q[1]=-1.; q[2]= 1.;
-r[0]=-1.;r[1]= 1.; r[2]=-1.;
-s[0]= 1.;s[1]=-1.; s[2]=-1.;
-*/
-//for(wp=0.;wp<sqrt(2);wp+=0.1){
-for(wp=0.;wp<0.19;wp+=0.01){
-wq=wr=ws=0.;
-rad= compute_osculating_sphere_radius(p,q,r,s, wp, wq, wr, ws);
-printf("%f %f\n",wp,rad);
-}
-exit(0);
-}
 
-  parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME,
-		    NFILE,fnm,asize(pa),pa,asize(desc),desc,asize(bugs),bugs,
-                    &oenv);
 
   if (bSymmetrize && !bCenter) {
     fprintf(stdout,"Can not symmetrize without centering. Turning on -center\n");

@@ -28,6 +28,7 @@ comm-mode                = Linear
 nstcomm                  = 1
 ; group(s) for center of mass motion removal
 comm-grps                = 
+cutoff-scheme = group
 
 ; LANGEVIN DYNAMICS OPTIONS
 ; Friction coefficient (amu/ps) and random seed

@@ -1,11 +1,11 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6) 
 PROJECT (G_DENSITY CXX) 
 INCLUDE (CheckIncludeFiles)
-set_source_files_properties(g_density.c PROPERTIES LANGUAGE CXX )
-set_source_files_properties(gmx_density.c PROPERTIES LANGUAGE CXX )
+set_source_files_properties(g_density.cpp PROPERTIES LANGUAGE CXX )
+set_source_files_properties(gmx_density.cpp PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
 if (NOT MYGMX_SRC OR NOT MYGMX_BUILD)
-MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory. Pass them to cmake with -DMYGMX_SRC=..., etc.)")
+MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory (e.g. ~/gromacs-5.0/build/) . Pass them to cmake with -DMYGMX_SRC=..., etc. Note that if you compiled gromacs in the source directory, the two variable should point to the same directory.)")
 ENDIF(NOT MYGMX_SRC OR NOT MYGMX_BUILD)
 
 IF(${UNIX}) 
@@ -69,6 +69,7 @@ IF(${GMX_VERSION} VERSION_LESS 50000)
 	SET (HEADERLIST "gmx_statistics.h" "gmx_header_config.h" "version.h")
 	SET (STATIC_LIBFILE libgmx.a)
 	IF( CMAKE_HOST_SYSTEM MATCHES Darwin)
+		SET(CMAKE_FIND_FRAMEWORK LAST)
 		SET(DYNAMIC_LIBFILE libgmx.dylib)
 	ELSE( CMAKE_HOST_SYSTEM MATCHES Darwin)
 		SET (DYNAMIC_LIBFILE libgmx.so)
@@ -76,9 +77,10 @@ IF(${GMX_VERSION} VERSION_LESS 50000)
 ELSE(${GMX_VERSION} VERSION_LESS 50000) 
 
 ### version 5.x.x
-	SET (HEADERLIST "version.h" "string.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gmxpre.h")
+	SET (HEADERLIST "config.h" "version.h" "string.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gmxpre.h")
 	SET (STATIC_LIBFILE libgromacs.a)
 	IF( CMAKE_HOST_SYSTEM MATCHES Darwin)
+		SET(CMAKE_FIND_FRAMEWORK LAST)
 		SET (DYNAMIC_LIBFILE libgromacs.dylib)
 	ELSE( CMAKE_HOST_SYSTEM MATCHES Darwin)
 		SET (DYNAMIC_LIBFILE libgromacs.so)
@@ -134,16 +136,14 @@ MESSAGE(STATUS "==================================================")
 MESSAGE(STATUS "")
 
 
-
 # Let's tell cmake to check parameters for the examples
 ADD_SUBDIRECTORY(examples/ccl4-h2o)
 GET_DIRECTORY_PROPERTY(GROMACS_TOP_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_TOP_DIR)
 GET_DIRECTORY_PROPERTY(GROMACS_KERNEL_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_KERNEL_DIR)
 
 ADD_DEFINITIONS( -O3 -Wall  -pedantic  -Wno-unused -Wuninitialized  -ffast-math )
-ADD_EXECUTABLE(g_density g_density.c gmx_density.c)
+ADD_EXECUTABLE(g_density g_density.cpp gmx_density.cpp)
 MESSAGE(STATUS "GMX LIB:  ${GROMACS_LIBGMX}")
 TARGET_LINK_LIBRARIES(g_density pthread  ${GROMACS_LIBGMX} m dl )
-
 
 
