@@ -2236,6 +2236,16 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
                    kd_free( kd );
 		 }
 	}
+        for(int phase=SUPPORT_PHASE; phase < ng; phase++) { 
+    		free(cluster_size[phase]);
+    		free(cluster_map[phase]);
+    		free(cluster_analyzed[phase]);
+    		free(cluster_index[phase]);
+	}
+    	free(cluster_size);
+    	free(cluster_map);
+    	free(cluster_index);
+    	free(cluster_analyzed);
 }
 
 
@@ -3688,7 +3698,7 @@ geometry[0]=geometry[1];
 	}
   }
 #endif
-  parse_common_args(&argc,argv,0, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
+  parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
 
 
 
