@@ -1671,7 +1671,6 @@ int compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,
           	i++ ; 
 		if(i>=itim->n[SUPPORT_PHASE]) {printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE]); return 0; }
 	} while (result) ;
-	printf("scanned %d parts\n",i);
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
         i = 0;
@@ -2755,7 +2754,6 @@ This is too cluttered. Reorganize the code...
                 spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
 	}
   	/*This is Miguel's original algorithm. */
-printf("n[%d]=%d\n",j,itim->n[j]);
 	for(i=0;i<itim->n[j];i++){
 		molecular_layer=0;
 		atomic_layer=0;
