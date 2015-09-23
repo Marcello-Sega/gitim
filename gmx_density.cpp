@@ -1671,6 +1671,7 @@ int compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,
           	i++ ; 
 		if(i>=itim->n[SUPPORT_PHASE]) {printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE]); return 0; }
 	} while (result) ;
+	printf("scanned %d parts\n",i);
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
         i = 0;
@@ -1887,7 +1888,7 @@ void dump_slabs(t_topology* top, int dump_mol){
 	static int frame[2]={0,0};
 	static FILE * (fp[2])={NULL,NULL};
         ITIM * itim=global_itim; 
-	int isizem, *indexm,*backindex;
+	int isizem, *indexm=NULL,*backindex=NULL;
 	char fname[2048];
 	if(dump_mol!=0 && dump_mol!=1) exit(printf("Internal error, dump_mol != 1 || 0 \n"));
 	sprintf(fname,"layers.pdb");
@@ -2243,7 +2244,6 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
     	free(cluster_map);
     	free(cluster_index);
     	free(cluster_analyzed);
-
 }
 
 
@@ -2755,6 +2755,7 @@ This is too cluttered. Reorganize the code...
                 spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
 	}
   	/*This is Miguel's original algorithm. */
+printf("n[%d]=%d\n",j,itim->n[j]);
 	for(i=0;i<itim->n[j];i++){
 		molecular_layer=0;
 		atomic_layer=0;
@@ -3695,7 +3696,7 @@ geometry[0]=geometry[1];
 	}
   }
 #endif
-  parse_common_args(&argc,argv,0, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
+  parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
 
 
 
