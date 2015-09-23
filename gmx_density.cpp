@@ -87,7 +87,7 @@ NOTE: how to acess atom properties
 
 #define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c))
 #define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(e),(f))
-#include "gmxpre.h"
+//#include "gmxpre.h"
 #include "gromacs/commandline/cmdlinemodulemanager.h"
 #include "gromacs/commandline/cmdlinehelpcontext.h"
 
@@ -97,25 +97,23 @@ NOTE: how to acess atom properties
 #include <string.h>
 
 
-#include "gromacs/commandline/pargs.h"
-#include "gromacs/fileio/tpxio.h"
-#include "gromacs/fileio/trxio.h"
-#include "gromacs/fileio/xvgr.h"
-#include "gromacs/gmxana/gmx_ana.h"
-#include "gromacs/gmxana/gstat.h"
-#include "gromacs/legacyheaders/macros.h"
-#include "gromacs/legacyheaders/typedefs.h"
-#include "gromacs/legacyheaders/viewit.h"
-#include "gromacs/math/units.h"
-#include "gromacs/math/vec.h"
-#include "gromacs/pbcutil/pbc.h"
-#include "gromacs/pbcutil/rmpbc.h"
-#include "gromacs/topology/index.h"
-#include "gromacs/utility/cstringutil.h"
-#include "gromacs/utility/fatalerror.h"
-#include "gromacs/utility/file.h"
-#include "gromacs/utility/futil.h"
-#include "gromacs/utility/smalloc.h"
+#include "commandline/pargs.h"
+#include "tpxio.h"
+#include "trxio.h"
+#include "xvgr.h"
+#include "gmx_ana.h"
+#include "gstat.h"
+#include "macros.h"
+#include "typedefs.h"
+#include "viewit.h"
+#include "vec.h"
+#include "pbc.h"
+#include "rmpbc.h"
+#include "index.h"
+#include "cstringutil.h"
+#include "file.h"
+#include "futil.h"
+#include "smalloc.h"
 
 
 #endif
@@ -2235,6 +2233,17 @@ void generate_mask_ns(int bCluster, int bInclusive, rvec * gmx_coords, int ** ma
                    kd_free( kd );
 		 }
 	}
+        for(int phase=SUPPORT_PHASE; phase < ng; phase++) { 
+    		free(cluster_size[phase]);
+    		free(cluster_map[phase]);
+    		free(cluster_analyzed[phase]);
+    		free(cluster_index[phase]);
+	}
+    	free(cluster_size);
+    	free(cluster_map);
+    	free(cluster_index);
+    	free(cluster_analyzed);
+
 }
 
 
