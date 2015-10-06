@@ -32,7 +32,7 @@ SET( GMX
 # these are possible subdirectories where to find headers/libs, for each of the GMX dirs. This
 # should take care of the tree differences between gmx v. 4 and v. 5, and minimize the changes in
 # the code.
-SET (HEADER_SUBDIRS "include" "src/" "src/gmxlib"  "src/gromacs/" "src/gromacs/utility" "src/gromacs/gmxana/" "src/gromacs/math/" "src/gromacs/fileio/" "src/gromacs/math/" "src/gromacs/pbcutil/" "src/gromacs/legacyheaders/" "src/gromacs/selection/" "lib/" "gmxlib"  "gromacs/" "gromacs/utility" "gromacs/gmxana/" "gromacs/math/" "gromacs/fileio/" "gromacs/math/" "gromacs/pbcutil/" "gromacs/legacyheaders/" "gromacs/selection/" "src/gromacs/utilities/" "src/gromacs/legacyheaders/" )
+SET (HEADER_SUBDIRS "include" "src/" "src/gmxlib"  "src/gromacs/" "src/gromacs/utility" "src/gromacs/gmxana/" "src/gromacs/math/" "src/gromacs/fileio/" "src/gromacs/math/" "src/gromacs/pbcutil/" "src/gromacs/legacyheaders/" "src/gromacs/selection/" "lib/" "gmxlib"  "gromacs/" "gromacs/utility" "gromacs/gmxana/" "gromacs/math/" "gromacs/fileio/" "gromacs/math/" "gromacs/pbcutil/" "gromacs/legacyheaders/" "gromacs/selection/" "src/gromacs/utilities/" "src/gromacs/legacyheaders/" "src/external/boost")
 
 # let's combine everything
 SET(MYPATHS    ${GMX})
@@ -82,7 +82,7 @@ IF(${GMX_VERSION} VERSION_LESS 50000)
 ELSE(${GMX_VERSION} VERSION_LESS 50000) 
 
 ### version 5.x.x
-	SET (HEADERLIST "config.h" "version.h" "string.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gromacs/commandline/cmdlinemodulemanager.h" "gmx_header_config_gen.h" "utility.h" "vec.h" )
+	SET (HEADERLIST "config.h" "version.h" "string.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gromacs/commandline/cmdlinemodulemanager.h" "gmx_header_config_gen.h" "utility.h" "vec.h" "boost/shared_ptr.hpp" )
 	SET (STATIC_LIBFILE libgromacs.a)
 	IF( CMAKE_HOST_SYSTEM MATCHES Darwin)
 		SET(CMAKE_FIND_FRAMEWORK LAST)
