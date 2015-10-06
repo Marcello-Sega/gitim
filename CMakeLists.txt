@@ -4,9 +4,9 @@ INCLUDE (CheckIncludeFiles)
 set_source_files_properties(g_density.cpp PROPERTIES LANGUAGE CXX )
 set_source_files_properties(gmx_density.cpp PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
-if (NOT MYGMX_SRC OR NOT MYGMX_BUILD)
-MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory (e.g. ~/gromacs-5.0/build/) . Pass them to cmake with -DMYGMX_SRC=..., etc. Note that if you compiled gromacs in the source directory, the two variable should point to the same directory.)")
-ENDIF(NOT MYGMX_SRC OR NOT MYGMX_BUILD)
+if (NOT MYGMX_TREE OR NOT MYGMX_BUILD)
+MESSAGE(FATAL_ERROR "MISSING MYGMX_TREE or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory (e.g. ~/gromacs-5.0/build/) . Pass them to cmake with -DMYGMX_TREE=..., etc. Note that if you compiled gromacs in the source directory, the two variable should point to the same directory.)")
+ENDIF(NOT MYGMX_TREE OR NOT MYGMX_BUILD)
 
 IF(GITIM_LR) 
  ADD_DEFINITIONS(-DGITIM_LR)
@@ -23,7 +23,7 @@ ENDIF(${UNIX})
 # these are possible locatsions of gromacs' distribution source / headers / libraries
 SET( GMX
 "${MYGMX_BUILD}/"
-"${MYGMX_SRC}/"
+"${MYGMX_TREE}/"
 "/usr/include/"
 "/usr/lib/"
 "/usr/local/include/"
@@ -142,13 +142,21 @@ MESSAGE(STATUS "")
 
 
 # Let's tell cmake to check parameters for the examples
-ADD_SUBDIRECTORY(examples/ccl4-h2o)
-GET_DIRECTORY_PROPERTY(GROMACS_TOP_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_TOP_DIR)
-GET_DIRECTORY_PROPERTY(GROMACS_KERNEL_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_KERNEL_DIR)
+#ADD_SUBDIRECTORY(examples/ccl4-h2o)
+#GET_DIRECTORY_PROPERTY(GROMACS_TOP_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_TOP_DIR)
+#GET_DIRECTORY_PROPERTY(GROMACS_KERNEL_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_KERNEL_DIR)
 
 ADD_DEFINITIONS( -O3 -Wall  -pedantic  -Wno-unused -Wuninitialized  -ffast-math )
 ADD_EXECUTABLE(g_density g_density.cpp gmx_density.cpp)
 MESSAGE(STATUS "GMX LIB:  ${GROMACS_LIBGMX}")
 TARGET_LINK_LIBRARIES(g_density pthread  ${GROMACS_LIBGMX} m dl )
+
+IF(${GMX_VERSION} VERSION_LESS 50000)
+# todo
+ELSE(${GMX_VERSION} VERSION_LESS 50000)
+	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nGDENS=../../g_density\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
+ENDIF(${GMX_VERSION} VERSION_LESS 50000)
+
+add_custom_command(TARGET  g_density PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o $<TARGET_FILE_DIR:g_density>/examples/ccl4-h2o)
 
 

@@ -1192,10 +1192,10 @@ int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int lin
           	}
           }
         }
-        for(n=SUPPORT_PHASE+1;n<itim->nphases;n++){ // one (intrinsic) histogram for each of the other phases
-            	if(molecular == ATOMIC && phase==n && TYPE==INTRINSIC_DENSITY) return index;
-            	index++;
+        for(n=SUPPORT_PHASE+1;n<itim->nphases;n++){ // two (nonintrinsic + intrinsic) histogram for each of the other phases
             	if(molecular == ATOMIC && phase==n && TYPE==LAYER_DISTRIBUTION) return index;
+            	index++;
+            	if(molecular == ATOMIC && phase==n && TYPE==INTRINSIC_DENSITY) return index;
             	index++;
         }
         if (TYPE==INTRINSIC_ORDER) {
@@ -1226,22 +1226,22 @@ void plot_intrinsic_density(Histogram * histo,char **grpmname, const char * fn, 
    fprintf(cid,"#column %d : position \n",column); column++;		
    for (moltype=0;moltype<=MOLECULAR-ATOMIC;moltype++){
       for(i=1;i<itim->maxlayers+1;i++){
-	fprintf(cid,"#column %d : %s distribution %s layer %d\n",column,modif[moltype],grpmname[0],i); column++;		
-	fprintf(cid,"#column %d : %s density %s layer %d\n",column,modif[moltype],grpmname[0],i); column++;		
+	fprintf(cid,"#column %d : %s nonintr. dens. %s layer %d\n",column,modif[moltype],grpmname[0],i); column++;		
+	fprintf(cid,"#column %d : %s intrins. dens. %s layer %d\n",column,modif[moltype],grpmname[0],i); column++;		
       }
    }
    for(int add=0;add<itim->nadd_index;add++){
      for (moltype=0;moltype<=MOLECULAR-ATOMIC;moltype++){
         for(i=1;i<itim->maxlayers+1;i++){
-          fprintf(cid,"#column %d : %s distribution %s layer %d\n",column,modif[moltype],grpmname[itim->ngmxphases+add],i); column++;		
-          fprintf(cid,"#column %d : %s density %s layer %d\n",column,modif[moltype],grpmname[itim->ngmxphases+add],i); column++;		
+          fprintf(cid,"#column %d : %s  nonintr. dens. %s layer %d\n",column,modif[moltype],grpmname[itim->ngmxphases+add],i); column++;		
+          fprintf(cid,"#column %d : %s  intrins. dens. %s layer %d\n",column,modif[moltype],grpmname[itim->ngmxphases+add],i); column++;		
         }
      }
    }
 
    for(n=SUPPORT_PHASE+1;n<nphases;n++){
-     fprintf(cid,"#column %d : %s distribution %s\n",column,modif[ATOMIC],grpmname[n]); column++;
-     fprintf(cid,"#column %d : %s density %s\n",column,modif[ATOMIC],grpmname[n]); column++;
+     fprintf(cid,"#column %d : %s  nonintr. dens. %s\n",column,modif[ATOMIC],grpmname[n]); column++;
+     fprintf(cid,"#column %d : %s  intrins. dens. %s\n",column,modif[ATOMIC],grpmname[n]); column++;
      fflush(cid);
    }
    for(j=0;j<histo->nbins;j++) { 
