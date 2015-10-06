@@ -29,21 +29,21 @@ if you found bugs or if you have feature requests.
 
                       COMPILING
 ========================================================
+create a build directory, e.g. inside the source tree:
+  
+   cd g_density/ 
+   mkdir build
+   cd build
 
-Option 1: replace g_density in your gromacs distribution
---------------------------------------------------------
-
-Just copy the file gmx_density.c in your src/tools/ subdirectory
-of gromacs source, and rebuild it.
+launch cmake providing the location of your gromacs tree
+and your gromacs build, e.g. 
 
 
-Option 2: stand-alone program
---------------------------------------------------------
+   cmake .. -DMYGMX_SRC=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
 
-Edit the $GROMACS field in the makefile so that it points to the
-base directory of a gromacs source distribution (tested with 4.5.5
-so far, but older 4.x versions are most likely fine). Run `make'.
-
+compile
+   
+   make
 
                      KNOWN BUGS
 ========================================================
