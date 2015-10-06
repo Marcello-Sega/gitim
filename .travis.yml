@@ -1,0 +1,73 @@
+language: cpp
+
+before_install:
+# - sudo apt-get clean
+# - sudo apt-get update
+# - sudo apt-get install build-essential 
+- sudo apt-add-repository -y ppa:smspillaz/cmake-2.8.12
+- sudo apt-get update -qq
+#- sudo apt-get install libboost-dev
+
+env:
+- GMX=5.1
+- GMX=5.0.6
+- GMX=5.0.5
+- GMX=5.0.4
+- GMX=5.0.3
+- GMX=5.0.2
+- GMX=5.0.1
+- GMX=5.0
+- GMX=4.6.7
+- GMX=4.6.6
+- GMX=4.6.5
+- GMX=4.6.4
+- GMX=4.6.3
+- GMX=4.6.2
+- GMX=4.6.1
+- GMX=4.6
+
+
+
+install: 
+- sudo apt-get install -y cmake cmake-data libproj-dev libeigen3-dev
+
+
+before_script:
+ - ./maintainer/travis/build.sh
+ - mkdir build
+ - cd build
+ - cmake .. -DMYGMX_TREE=gromacs -DMYGMX_BUILD=gromacs/build 
+
+script:  make
+
+
+#env:
+#  - myconfig=default
+#  - myconfig=maxset
+#  - myconfig=molcut
+#  - myconfig=rest1
+#  - myconfig=rest2
+#  - make_check=false myconfig=nocheck-maxset
+#  - with_fftw=false with_mpi=false myconfig=maxset
+
+compiler:
+  - gcc
+
+
+#matrix:
+#  include:
+#    - compiler: clang
+#      env: with-mpi=false myconfig=default
+#    - compiler: clang
+#      env: with-mpi=false myconfig=maxset
+#    - compiler: clang
+#      env: with-mpi=false myconfig=molcut
+#    - compiler: clang
+#      env: with-mpi=false myconfig=rest1
+#    - compiler: clang
+#      env: with-mpi=false myconfig=rest2
+#    - compiler: clang
+#      env: with-mpi=false make_check=false myconfig=nocheck-maxset 
+#    - compiler: clang
+#      env: with-mpi=false myconfig=maxset without-cuda
+#

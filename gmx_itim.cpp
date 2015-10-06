@@ -73,9 +73,9 @@ NOTE: how to acess atom properties
 #include <nbsearch.h>
 #ifdef UNIX  
 // used for handling signals
-#include<stdio.h>
-#include<signal.h>
-#include<unistd.h>
+#include <stdio.h>
+#include <csignal>
+#include <unistd.h>
 #endif //UNIX
 
 #define gmx_ffopen ffopen
@@ -3691,9 +3691,14 @@ geometry[0]=geometry[1];
 #if GMX_VERSION >= 50000
   for(int iarg=0; iarg < argc ; iarg ++ ) { // this is horrible, but couldn't get the hang of the new parse_common_args()
 	if(!strcmp(argv[iarg],"-h")){
+#if GMX_VERSION < 50100
             gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL);
+#else
+            gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL,"itim");
+#endif
             gmx::GlobalCommandLineHelpContext global(context);
             gmx_bool res = parse_common_args(&argc,argv,0, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
+
 	    exit(0);   
 	}
   }

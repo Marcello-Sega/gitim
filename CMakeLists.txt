@@ -1,12 +1,27 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6) 
-PROJECT (G_DENSITY CXX) 
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11) 
+PROJECT (G_ITIM CXX) 
 INCLUDE (CheckIncludeFiles)
-set_source_files_properties(g_density.cpp PROPERTIES LANGUAGE CXX )
-set_source_files_properties(gmx_density.cpp PROPERTIES LANGUAGE CXX )
+set_source_files_properties(g_itim.cpp PROPERTIES LANGUAGE CXX )
+set_source_files_properties(gmx_itim.cpp PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
 if (NOT MYGMX_TREE OR NOT MYGMX_BUILD)
 MESSAGE(FATAL_ERROR "MISSING MYGMX_TREE or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory (e.g. ~/gromacs-5.0/build/) . Pass them to cmake with -DMYGMX_TREE=..., etc. Note that if you compiled gromacs in the source directory, the two variable should point to the same directory.)")
 ENDIF(NOT MYGMX_TREE OR NOT MYGMX_BUILD)
+
+get_filename_component(MYGMX_BUILD ${MYGMX_BUILD}  REALPATH) 
+get_filename_component(MYGMX_TREE ${MYGMX_TREE}  REALPATH) 
+
+MACRO(SUBDIRLIST result curdir)
+  FILE(GLOB_RECURSE children "${curdir}/*")
+  SET(dirlist "")
+  FOREACH(child ${children}) 
+    get_filename_component(child ${child} DIRECTORY)
+    LIST(APPEND dirlist ${child})
+  ENDFOREACH()
+  LIST(REMOVE_DUPLICATES dirlist)
+  SET(${result} ${dirlist})
+ENDMACRO()
+
 
 IF(GITIM_LR) 
  ADD_DEFINITIONS(-DGITIM_LR)
@@ -16,47 +31,52 @@ ENDIF(GITIM_LR)
 IF(${UNIX}) 
  ADD_DEFINITIONS(-DUNIX)
 ENDIF(${UNIX})
+# get_filename_component() is fundamental, as glob seems -so far- not to undersand '~'  
 
-#IF(VIRIAL_EXTENSION)
-#	 add_definitions(-DVIRIAL_EXTENSION)
-#ENDIF(VIRIAL_EXTENSION)
-# these are possible locatsions of gromacs' distribution source / headers / libraries
-SET( GMX
-"${MYGMX_BUILD}/"
-"${MYGMX_TREE}/"
-"/usr/include/"
-"/usr/lib/"
-"/usr/local/include/"
-"/usr/local/lib/"
-)
+SET( GMX "${MYGMX_BUILD}" "${MYGMX_TREE}" )
+
 # these are possible subdirectories where to find headers/libs, for each of the GMX dirs. This
 # should take care of the tree differences between gmx v. 4 and v. 5, and minimize the changes in
 # the code.
-SET (HEADER_SUBDIRS "include" "src/" "src/gmxlib"  "src/gromacs/" "src/gromacs/utility" "src/gromacs/gmxana/" "src/gromacs/math/" "src/gromacs/fileio/" "src/gromacs/math/" "src/gromacs/pbcutil/" "src/gromacs/legacyheaders/" "src/gromacs/selection/" "lib/" "gmxlib"  "gromacs/" "gromacs/utility" "gromacs/gmxana/" "gromacs/math/" "gromacs/fileio/" "gromacs/math/" "gromacs/pbcutil/" "gromacs/legacyheaders/" "gromacs/selection/" "src/gromacs/utilities/" "src/gromacs/legacyheaders/" )
+#SET (HEADER_SUBDIRS "include" "src" "lib" "src/gromacs" "src/external/boost/")
 
 # let's combine everything
-SET(MYPATHS    ${GMX})
-FOREACH (DIR ${GMX})
-	FOREACH (SUBDIR ${HEADER_SUBDIRS})
-		LIST(APPEND MYPATHS "${DIR}/${SUBDIR}/")
-	ENDFOREACH(SUBDIR)
-ENDFOREACH(DIR)
+
+SET(MYPATHS ${MYGMX_TREE})
+LIST(APPEND MYPATHS ${MYGMX_BUILD})
+SUBDIRLIST(SUBDIRS ${MYGMX_TREE})
+LIST(APPEND MYPATHS ${SUBDIRS})
+SUBDIRLIST(SUBDIRS ${MYGMX_BUILD})
+LIST(APPEND MYPATHS ${SUBDIRS})
+
+#FOREACH (DIR ${GMX})
+#	FOREACH (SUBDIR ${HEADER_SUBDIRS})
+#		LIST(APPEND MYPATHS ${DIR}${SUBDIR})
+#	ENDFOREACH(SUBDIR)
+#ENDFOREACH(DIR)
+
 
 # let's first check which version are we using
 # NOTE that gmx 4.6.x has another version.h file (without the info on the version...) in src/gmxlib/ 
 #      we need to avoid that one by searching first for the include/ subdirs
-FIND_FILE(VERSION_H version.h PATHS ${MYPATHS})
-IF(NOT VERSION_H)
-	MESSAGE(FATAL_ERROR "Not able to find a version.h file in ${MYPATHS}")
-ENDIF(NOT VERSION_H)
+FILE(GLOB_RECURSE versions "${MYGMX_BUILD}/*version.h")
+IF(NOT versions)
+	MESSAGE(FATAL_ERROR "Not able to find a version.h file")
+ENDIF(NOT versions)
+SET(GMX_VERSION NONE)
+FOREACH(VERSION_H ${versions})
+	MESSAGE(STATUS "checking version file ${VERSION_H}")
+	FILE (READ ${VERSION_H} STRING_VERSION_H)
+	IF("${STRING_VERSION_H}" MATCHES "#define GMX_VERSION" ) 
+		STRING(REGEX REPLACE ".*#define GMX_VERSION ([0-9]+).*" "\\1" GMX_VERSION "${STRING_VERSION_H}")
+		break()
+	ENDIF()
+ENDFOREACH(VERSION_H)
 
-MESSAGE(STATUS "Using version file ${VERSION_H}")
-FILE (STRINGS ${VERSION_H} STRING_VERSION_H)
-IF(NOT  "${STRING_VERSION_H}" MATCHES "#define GMX_VERSION" ) 
-	MESSAGE(FATAL_ERROR "Unable to determine gromacs version from file: ${VERSION_H}")
-ENDIF(NOT  "${STRING_VERSION_H}" MATCHES "#define GMX_VERSION" ) 
+IF(${GMX_VERSION} MATCHES "NONE" )
+        MESSAGE(FATAL_ERROR "Unable to determine gromacs version from file: ${VERSION_H}")
+ENDIF()
 
-STRING(REGEX REPLACE ".*#define GMX_VERSION ([0-9]+).*" "\\1" GMX_VERSION "${STRING_VERSION_H}")
 SET (MINGMXVERS 40601)
 IF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
    MESSAGE(FATAL_ERROR "Version ${GMX_VERSION} < ${MINGMXVERS}")
@@ -82,7 +102,10 @@ IF(${GMX_VERSION} VERSION_LESS 50000)
 ELSE(${GMX_VERSION} VERSION_LESS 50000) 
 
 ### version 5.x.x
-	SET (HEADERLIST "config.h" "version.h" "string.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gromacs/commandline/cmdlinemodulemanager.h" "gmx_header_config_gen.h" "utility.h" "vec.h" )
+	SET (HEADERLIST "config.h" "version.h" "smalloc.h" "gstat.h" "vec.h" "xvgr.h" "pbc.h" "copyrite.h" "futil.h" "tpxio.h" "gmx_ana.h" "nbsearch.h" "gromacs/commandline/cmdlinemodulemanager.h" "utility.h" "vec.h" "shared_ptr.hpp" "baseversion-gen.c")
+IF(${GMX_VERSION} VERSION_GREATER 50000) 
+	SET (HEADERLIST ${HEADERLIST} "index.h" )
+ENDIF()
 	SET (STATIC_LIBFILE libgromacs.a)
 	IF( CMAKE_HOST_SYSTEM MATCHES Darwin)
 		SET(CMAKE_FIND_FRAMEWORK LAST)
@@ -109,54 +132,50 @@ IF(GROMACS_LIBGMX_DYNAMIC)
 ENDIF(GROMACS_LIBGMX_DYNAMIC)
 
 
+        
+SET (SUFFIXES gmxana gmxlib math fileio pbcutil legacyheaders selection utility pbcutil boost)
 
 FOREACH(HEADER ${HEADERLIST})
 	# looks like we have to reset TMPDIR every time to the failure value.
 	SET(TMPDIR "TMPDIR-NOTFOUND")
-	FIND_PATH(TMPDIR ${HEADER} PATHS ${MYPATHS})
+	FIND_PATH(TMPDIR ${HEADER} PATHS ${MYPATHS} NO_DEFAULT_PATH PATH_SUFFIXES ${SUFFIXES})
 	IF(NOT TMPDIR)
    		MESSAGE(FATAL_ERROR "Unable to find ${HEADER} in ${MYPATHS} :: ${TMPDIR}")
 	ENDIF(NOT TMPDIR)
-	MESSAGE(STATUS "found ${HEADER} in ${TMPDIR}")
+	FOREACH(SUFFIX ${SUFFIXES})
+		STRING(FIND ${TMPDIR} ${SUFFIX} FOUND )
+		IF(${FOUND} GREATER -1 )
+		INCLUDE_DIRECTORIES(${TMPDIR}/../)
+		ENDIF()
+	ENDFOREACH()
+
 	INCLUDE_DIRECTORIES(${TMPDIR})
 ENDFOREACH(HEADER)
 IF(NOT GROMACS_LIBGMX)
    MESSAGE(FATAL_ERROR "Unable to find libraries")
 ENDIF(NOT GROMACS_LIBGMX)
 	
-#-I/home/marcello/gromacs.gerrit/src/gromacs/selection -I /home/marcello/gromacs.gerrit/src/gromacs/legacyheaders/ -I/home/marcello/gromacs.gerrit/src/gromacs/pbcutil/ -I/home/marcello/gromacs.gerrit/src/gromacs/fileio/  -I/home/marcello/gromacs.gerrit/src/gromacs/math/  -I/home/marcello/gromacs.gerrit/src -I/home/marcello/gromacs.gerrit/src/gromacs/utility/  -I/home/marcello/gromacs.gerrit/build/  -I/home/marcello/gromacs.gerrit/src/gromacs/gmxana/
-
-
-
-
-
-##get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-##MESSAGE(STATUS "Found gromacs headers in ${dirs}")
 
 MESSAGE(STATUS "")
 MESSAGE(STATUS "==================================================")
-MESSAGE(STATUS "Using libraries in: ${GROMACS_LIBGMX} ")
-MESSAGE(STATUS "Using headers in: ${TMPDIR}")
+MESSAGE(STATUS "Using libraries: ${GROMACS_LIBGMX} ")
 MESSAGE(STATUS "==================================================")
 MESSAGE(STATUS "")
 
 
 # Let's tell cmake to check parameters for the examples
-#ADD_SUBDIRECTORY(examples/ccl4-h2o)
-#GET_DIRECTORY_PROPERTY(GROMACS_TOP_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_TOP_DIR)
-#GET_DIRECTORY_PROPERTY(GROMACS_KERNEL_DIR DIRECTORY examples/ccl4-h2o DEFINITION GROMACS_KERNEL_DIR)
 
 ADD_DEFINITIONS( -O3 -Wall  -pedantic  -Wno-unused -Wuninitialized  -ffast-math )
-ADD_EXECUTABLE(g_density g_density.cpp gmx_density.cpp)
+ADD_EXECUTABLE(g_itim g_itim.cpp gmx_itim.cpp)
 MESSAGE(STATUS "GMX LIB:  ${GROMACS_LIBGMX}")
-TARGET_LINK_LIBRARIES(g_density pthread  ${GROMACS_LIBGMX} m dl )
+TARGET_LINK_LIBRARIES(g_itim pthread  ${GROMACS_LIBGMX} m dl )
 
 IF(${GMX_VERSION} VERSION_LESS 50000)
 # todo
 ELSE(${GMX_VERSION} VERSION_LESS 50000)
-	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nGDENS=../../g_density\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
+	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nGDENS=../../g_itim\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
 ENDIF(${GMX_VERSION} VERSION_LESS 50000)
 
-add_custom_command(TARGET  g_density PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o $<TARGET_FILE_DIR:g_density>/examples/ccl4-h2o)
+add_custom_command(TARGET  g_itim PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o $<TARGET_FILE_DIR:g_itim>/examples/ccl4-h2o)
 
 
