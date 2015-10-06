@@ -8,6 +8,11 @@ if (NOT MYGMX_SRC OR NOT MYGMX_BUILD)
 MESSAGE(FATAL_ERROR "MISSING MYGMX_SRC or MYGMX_BUILD options to specify the path of the gromacs source base directory (e.g. ~/gromacs-5.0/) and build directory (e.g. ~/gromacs-5.0/build/) . Pass them to cmake with -DMYGMX_SRC=..., etc. Note that if you compiled gromacs in the source directory, the two variable should point to the same directory.)")
 ENDIF(NOT MYGMX_SRC OR NOT MYGMX_BUILD)
 
+IF(GITIM_LR) 
+ ADD_DEFINITIONS(-DGITIM_LR)
+ MESSAGE(STATUS "Switching on suport for left/right interface (through the environment variables GITIM_LEFT and GITIM_RIGHT)" )
+ENDIF(GITIM_LR)
+
 IF(${UNIX}) 
  ADD_DEFINITIONS(-DUNIX)
 ENDIF(${UNIX})

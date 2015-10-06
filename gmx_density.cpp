@@ -2850,6 +2850,10 @@ This is too cluttered. Reorganize the code...
 			    p4[2]=(((real)rand()/RAND_MAX)-0.5)*itim->box[2];
                      }
                 }
+#ifdef GITIM_LR
+		if(NULL!=getenv("GITIM_LEFT")  && p4[2]>0 ) continue;
+		if(NULL!=getenv("GITIM_RIGHT")  && p4[2]<0 ) continue;
+#endif
                 switch(itim->geometry){
                                 case SURFACE_PLANE: if(fabs(p4[2])>size) continue; break;
                                 default: exit(printf("No such a geometry (%d)\n",itim->geometry));
