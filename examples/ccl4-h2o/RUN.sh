@@ -7,21 +7,44 @@ source include.sh
 
 echo "g_density needs a .tpr file, let's create it now...."
 eval $GROMPP -f grompp.mdp -p $TOPOL -c ccl4-h2o.gro  -maxwarn 10  -o ccl4-h2o.tpr> grompp.log 2>&1 
-echo "0 4 5" > masscom.dat
+echo -e "a OW  \n  a OW | a HW1 | a HW2  \n name 7 H2O \n q"| $MAKENDX -f ccl4-h2o.gro > makendx.log 2>&1 
 echo "Using $GDENS ..."
+COMMON_OPT="-f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr -n index.ndx "
 if [ -a ccl4-h2o.tpr ] ; then 
-        name=dens_H2O_atomic_m ; echo "Intrinsic mass density profile w.r.t. water -> $name.xvg"
-	echo "SOL SOL CCl4"  | $GDENS  -intrinsic -dens mass -f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr  -o $name.xvg  > $name.log 2>&1 
-        name=dens_CCl4_atomic_m ; echo "Intrinsic mass density profile w.r.t. ccl4-> $name.xvg"
-	echo "CCl4 SOL CCl4" | $GDENS  -intrinsic -dens mass -f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr  -o $name.xvg  > $name.log   2>&1 
-        name=dens_H2O_atomic_n ; echo "Intrinsic number density profile w.r.t. water -> $name.xvg"
-	echo "SOL SOL CCl4"  | $GDENS  -intrinsic -dens number -f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr    -o $name.xvg  > $name.log   2>&1 
-        name=dens_CCl4_atomic_n ; echo "Intrinsic number density profile w.r.t. ccl4 -> $name.xvg"
-	echo "CCl4 SOL CCl4" | $GDENS  -intrinsic -dens number -f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr    -o $name.xvg  > $name.log  2>&1 
-        name=dens_H2O_atomicMC_m ; echo "Intrinsic mass density profile w.r.t. water with Monte Carlo normalization-> $name.xvg"
-	echo "SOL SOL CCl4"  | $GDENS  -intrinsic -MCnorm -dens mass -f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr  -o $name.xvg  > $name.log 2>&1 
-        name=dens_H2O_molecularMC_m ; echo "Intrinsic molecular mass density profile w.r.t. water with Monte Carlo normalization-> $name.xvg"
-	echo "SOL SOL CCl4"  | $GDENS  -intrinsic -MCnorm -dens mass -com -f ccl4-h2o.gro -ng 3 -center -sl 200 -s ccl4-h2o.tpr  -o $name.xvg  > $name.log 2>&1 
+        name=dens_H2O_atomic_m ; 
+	echo "H2O H2O CCl4"  | $GDENS  $COMMON_OPT  -o $name.xvg  -dens mass            > $name.log 2>&1 
+	if ! [ -a $name.xvg ] ; then echo "Some error occurred, check $name.log. Quitting." ; exit ; fi
+	echo "Intrinsic mass density profile w.r.t. water -> $name.xvg"
+
+        name=dens_CCl4_atomic_m ; 
+	echo "CCl4 H2O CCl4" | $GDENS  $COMMON_OPT  -o $name.xvg  -dens mass            > $name.log   2>&1 
+	if ! [ -a $name.xvg ] ; then echo "Some error occurred, check $name.log. Quitting." ; exit ; fi
+	echo "Intrinsic mass density profile w.r.t. ccl4-> $name.xvg"
+
+        name=dens_H2O_atomic_n ; 
+	echo "H2O H2O CCl4"  | $GDENS  $COMMON_OPT  -o $name.xvg  -dens number -layers 4 -dump > $name.log   2>&1 
+	mv layers.pdb layers_$name.pdb
+	if ! [ -a $name.xvg ] ; then echo "Some error occurred, check $name.log. Quitting." ; exit ; fi
+	echo "Intrinsic number density profile w.r.t. water + layer config -> $name.xvg, layers_$name.pdb"
+
+        name=dens_H2O_atomic_MC_n ; 
+	echo "H2O H2O CCl4"  | $GDENS  $COMMON_OPT  -o $name.xvg  -MCnorm -dens number  > $name.log 2>&1 
+	if ! [ -a $name.xvg ] ; then echo "Some error occurred, check $name.log. Quitting." ; exit ; fi
+	echo "Intrinsic number density profile w.r.t. water with Monte Carlo normalization -> $name.xvg"
+
+
+        name=dens_H2O_COM_n ; 
+	echo "H2O H2O CCl4 3 3 5"  | $GDENS  $COMMON_OPT  -o $name.xvg -dens number -com  > $name.log 2>&1 
+	if ! [ -a $name.xvg ] ; then echo "Some error occurred, check $name.log. Quitting." ; exit ; fi
+	echo "Intrinsic number density profile of the molecular COM, w.r.t. water -> $name.xvg"
+
+        name=dens_H2O_molecular_n ; 
+	echo "SOL SOL CCl4"  | $GDENS  $COMMON_OPT  -o $name.xvg  -dens number -mol  -layers 4 -dump    > $name.log 2>&1 
+	mv layers.pdb layers_$name.pdb
+	if ! [ -a $name.xvg ] ; then echo "Some error occurred, check $name.log. Quitting." ; exit ; fi
+	echo "Intrinsic number density profile w.r.t. water + layer config -> $name.xvg, layers_$name.pdb"
+
+echo "Intrinsic molecular mass density profile w.r.t. water with Monte Carlo normalization-> $name.xvg"
 else 
 	echo "Some errors probably occurred running grompp. Please have a look at grompp.log"
 

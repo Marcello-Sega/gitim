@@ -1,7 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11) 
 PROJECT (G_ITIM CXX) 
 INCLUDE (CheckIncludeFiles)
-set_source_files_properties(g_itim.cpp PROPERTIES LANGUAGE CXX )
 set_source_files_properties(gmx_itim.cpp PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
 if (NOT MYGMX_TREE OR NOT MYGMX_BUILD)
@@ -77,10 +76,10 @@ IF(${GMX_VERSION} MATCHES "NONE" )
         MESSAGE(FATAL_ERROR "Unable to determine gromacs version from file: ${VERSION_H}")
 ENDIF()
 
-SET (MINGMXVERS 40601)
-IF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
-   MESSAGE(FATAL_ERROR "Version ${GMX_VERSION} < ${MINGMXVERS}")
-ENDIF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
+#### SET (MINGMXVERS 40601)
+#### IF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
+####    MESSAGE(FATAL_ERROR "Version ${GMX_VERSION} < ${MINGMXVERS}")
+#### ENDIF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
 
 MESSAGE(STATUS "============================================================")
 MESSAGE(STATUS "GMX version: ${GMX_VERSION}    on    ${CMAKE_HOST_SYSTEM}   ")
@@ -166,14 +165,14 @@ MESSAGE(STATUS "")
 # Let's tell cmake to check parameters for the examples
 
 ADD_DEFINITIONS( -O3 -Wall  -pedantic  -Wno-unused -Wuninitialized  -ffast-math )
-ADD_EXECUTABLE(g_itim g_itim.cpp gmx_itim.cpp)
+ADD_EXECUTABLE(g_itim gmx_itim.cpp)
 MESSAGE(STATUS "GMX LIB:  ${GROMACS_LIBGMX}")
 TARGET_LINK_LIBRARIES(g_itim pthread  ${GROMACS_LIBGMX} m dl )
 
 IF(${GMX_VERSION} VERSION_LESS 50000)
 # todo
 ELSE(${GMX_VERSION} VERSION_LESS 50000)
-	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nGDENS=../../g_itim\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
+	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nMAKENDX='${MYGMX_BUILD}/bin/gmx make_ndx'\nGDENS=../../g_itim\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
 ENDIF(${GMX_VERSION} VERSION_LESS 50000)
 
 add_custom_command(TARGET  g_itim PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o $<TARGET_FILE_DIR:g_itim>/examples/ccl4-h2o)
