@@ -27,9 +27,6 @@ IF(GITIM_LR)
  MESSAGE(STATUS "Switching on suport for left/right interface (through the environment variables GITIM_LEFT and GITIM_RIGHT)" )
 ENDIF(GITIM_LR)
 
-IF(${UNIX}) 
- ADD_DEFINITIONS(-DUNIX)
-ENDIF(${UNIX})
 # get_filename_component() is fundamental, as glob seems -so far- not to undersand '~'  
 
 SET( GMX "${MYGMX_BUILD}" "${MYGMX_TREE}" )
@@ -75,6 +72,14 @@ ENDFOREACH(VERSION_H)
 IF(${GMX_VERSION} MATCHES "NONE" )
         MESSAGE(FATAL_ERROR "Unable to determine gromacs version from file: ${VERSION_H}")
 ENDIF()
+
+IF(${UNIX}) 
+# BUG: travis complaints about signal() are triggered only using GMX 5.1
+IF(${GMX_VERSION} VERSION_LESS 50100) 
+ ADD_DEFINITIONS(-DUNIX)
+ENDIF()
+ENDIF(${UNIX})
+
 
 #### SET (MINGMXVERS 40601)
 #### IF(${GMX_VERSION} VERSION_LESS ${MINGMXVERS})
