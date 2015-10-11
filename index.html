@@ -14,35 +14,54 @@
       <h1 class="project-name">Gitim</h1>
       <h2 class="project-tagline">Generalized Identification of Truly Interfacial Molecules</h2>
       <a href="https://github.com/Marcello-Sega/gitim" class="btn">View on GitHub</a>
-      <a href="https://github.com/Marcello-Sega/gitim/tarball/ITIM" class="btn">Download .tar.gz (ITIM branch)</a>
-      <a href="https://github.com/Marcello-Sega/gitim/tarball/GITIM" class="btn">Download .tar.gz (GITIM branch)</a>
+      <a href="https://github.com/Marcello-Sega/gitim/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/Marcello-Sega/gitim/tarball/master" class="btn">Download .tar.gz</a>
     </section>
 
     <section class="main-content">
-      <h3>
-<a id="status" class="anchor" href="#status" aria-hidden="true"><span class="octicon octicon-link"></span></a>Status</h3>
-
-<p><a href="https://travis-ci.org/Marcello-Sega/gitim"><img src="https://travis-ci.org/Marcello-Sega/gitim.svg?branch=ITIM" alt="Build Status"></a></p>
+      <h2>
+<a id="status-" class="anchor" href="#status-" aria-hidden="true"><span class="octicon octicon-link"></span></a>Status <a href="https://travis-ci.org/Marcello-Sega/gitim"><img src="https://travis-ci.org/Marcello-Sega/gitim.svg?branch=ITIM" alt="Build Status"></a>
+</h2>
 
 <h2>
-<a id="what-is-itimgitim" class="anchor" href="#what-is-itimgitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is ITIM/GITIM?</h2>
+<a id="quick-links" class="anchor" href="#quick-links" aria-hidden="true"><span class="octicon octicon-link"></span></a>Quick links</h2>
 
-<p><strong>ITIM</strong> and <strong>GITIM</strong> are two algorithms for the identification
+<ul>
+<li> <a href="#references">References</a>
+</li>
+<li> <a href="#how-to-compile">How to compile</a>
+</li>
+<li> <a href="TUTORIAL.md">Tutorial</a>
+</li>
+</ul>
+
+<h1>
+<a id="what-is-itimgitim" class="anchor" href="#what-is-itimgitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is ITIM/GITIM?</h1>
+
+<p><img src="media/soot1small.png" width="180" align="right">
+<strong>ITIM</strong> and <strong>GITIM</strong> are two algorithms for the identification
 of interfacial molecules or atoms. GITIM is a generalization of the
-ITIM algorithm, which was designed for planar interfaces. GITIM,
+ITIM algorithm, which has been designed for planar interfaces. GITIM,
 on the contrary, is free from any geometrical constraints and can
 be used to analyze intrinsic properties of surfaces with arbitrary
 shape. </p>
 
-<h2>
-<a id="what-can-i-find-here-" class="anchor" href="#what-can-i-find-here-" aria-hidden="true"><span class="octicon octicon-link"></span></a>What can I find here ?</h2>
+<h3>
+<a id="what-can-i-find-here-" class="anchor" href="#what-can-i-find-here-" aria-hidden="true"><span class="octicon octicon-link"></span></a>What can I find here ?</h3>
 
-<p>There are two branches, ITIM and GITIM, which implement the respective
-algorithms in the form of a program that can read
-<a href="http://www.gromacs.org">GROMACS</a> trajectories.</p>
+<ul>
+<li><p>Two code branches,
+<a href="https://github.com/Marcello-Sega/gitim/tree/ITIM">ITIM</a> and
+<a href="https://github.com/Marcello-Sega/gitim/tree/GITIM">GITIM</a>, which
+implement the respective algorithms in the form of a program that
+can read <a href="http://www.gromacs.org">GROMACS</a> trajectories.</p></li>
+<li><p>Instructions on <a href="#how-to-compile">how to compile</a> the software</p></li>
+<li><p>A tutorial on how to compute intrinsic profiles</p></li>
+<li><p>References</p></li>
+</ul>
 
-<h2>
-<a id="which-branch-should-i-use-itim-or-gitim" class="anchor" href="#which-branch-should-i-use-itim-or-gitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>Which branch should I use, ITIM or GITIM?</h2>
+<h3>
+<a id="which-branch-should-i-use-itim-or-gitim" class="anchor" href="#which-branch-should-i-use-itim-or-gitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>Which branch should I use, ITIM or GITIM?</h3>
 
 <p>If you are interested in planar interfaces only, use the ITIM branch.</p>
 
@@ -52,8 +71,8 @@ up-to-date, with a new build system that ensures compatibility with
 a broader range of GROMACS versions. New features/bugfix are being
 backported to the GITIM branch.</p>
 
-<h2>
-<a id="which-features-are-included" class="anchor" href="#which-features-are-included" aria-hidden="true"><span class="octicon octicon-link"></span></a>Which features are included?</h2>
+<h3>
+<a id="which-features-are-included" class="anchor" href="#which-features-are-included" aria-hidden="true"><span class="octicon octicon-link"></span></a>Which features are included?</h3>
 
 <ul>
 <li>Identification of interfacial atoms</li>
@@ -67,8 +86,8 @@ backported to the GITIM branch.</p>
 
 <p><em>Note: Some of the features are so far present only in the ITIM branch and are currently being ported to the GITIM branch.</em></p>
 
-<h2>
-<a id="which-code-is-faster-itim-or-gitim" class="anchor" href="#which-code-is-faster-itim-or-gitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>Which code is faster, ITIM or GITIM</h2>
+<h3>
+<a id="which-code-is-faster-itim-or-gitim" class="anchor" href="#which-code-is-faster-itim-or-gitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>Which code is faster, ITIM or GITIM</h3>
 
 <p>ITIM, by far. This is because GITIM needs to compute the alpha-shape
 of the phase, which in turn relies on the Delauney triangulation.
@@ -76,21 +95,23 @@ This is done through QHull, but it is still much slower than the
 ITIM algorithm.  So, if you only have to deal with planar interfaces,
 go for the ITIM branch.</p>
 
-<h2>
-<a id="what-do-i-need-to-build-the-code-" class="anchor" href="#what-do-i-need-to-build-the-code-" aria-hidden="true"><span class="octicon octicon-link"></span></a>What do I need to build the code ?</h2>
+<h3>
+<a id="what-do-i-need-to-build-the-code-" class="anchor" href="#what-do-i-need-to-build-the-code-" aria-hidden="true"><span class="octicon octicon-link"></span></a>What do I need to build the code ?</h3>
 
 <ul>
 <li>A gromacs build + sources (compatibility starting from GROMACS 4.6.7 up to 5.1) </li>
 <li>Cmake &gt;= 2.8.11</li>
 </ul>
 
-<h2>
-<a id="what-can-you-do-with-gitim" class="anchor" href="#what-can-you-do-with-gitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>What can you do with GITIM?</h2>
+<h3>
+<a id="what-can-you-do-with-gitim" class="anchor" href="#what-can-you-do-with-gitim" aria-hidden="true"><span class="octicon octicon-link"></span></a>What can you do with GITIM?</h3>
 
 <p>Check out the <a href="http://www.gitim.eu/usage-examples">usage example page</a> of the gitim web site <a href="http://www.gitim.eu">http://www.gitim.eu</a></p>
 
-<h2>
-<a id="references" class="anchor" href="#references" aria-hidden="true"><span class="octicon octicon-link"></span></a>References</h2>
+<hr>
+
+<h1>
+<a id="references" class="anchor" href="#references" aria-hidden="true"><span class="octicon octicon-link"></span></a>References</h1>
 
 <p>If you use this code to publish some research results, please read and cite both of the two following papers.</p>
 
@@ -98,6 +119,120 @@ go for the ITIM branch.</p>
 
 <p><a href="http://dx.doi.org/10.1002/jcc.20852">L. B. Pártay, G. Hantal, P. Jedlovszky, Á. Vincze and G. Horvai, <em>J. Comp. Chem.</em> <strong>29</strong>, 945 (2008)</a>
 A new method for determining the interfacial molecules and characterizing the surface roughness in computer simulations. Application to the liquid–vapor interface of water</p>
+
+<hr>
+
+<h1>
+<a id="how-to-compile" class="anchor" href="#how-to-compile" aria-hidden="true"><span class="octicon octicon-link"></span></a>How to compile</h1>
+
+<h3>
+<a id="requirements" class="anchor" href="#requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>Requirements</h3>
+
+<ul>
+<li>A working version of GROMACS (source code <em>and</em> build tree)</li>
+<li>Cmake (&gt;= 2.8.11)</li>
+<li>For GITIM only, the <a href="http://www.gnu.org/software/gsl/">Gnu Scientific Library</a> (GSL)</li>
+</ul>
+
+<p>Support of GROMACS versions from 4.6 up to 5.1 (included) is guaranteed for the <a href="https://github.com/Marcello-Sega/gitim/tree/ITIM">ITIM</a> branch.
+For the <a href="https://github.com/Marcello-Sega/gitim/tree/GITIM">GITIM</a>
+branch, the build system is currently being updated, and out-of-the-box
+compatibility with all GROMACS version is not guaranteed.</p>
+
+<h3>
+<a id="obtaining-the-software" class="anchor" href="#obtaining-the-software" aria-hidden="true"><span class="octicon octicon-link"></span></a>Obtaining the software</h3>
+
+<p>If you have <code>git</code> installed on your system, simply use the command</p>
+
+<pre><code>git clone https://github.com/Marcello-Sega/gitim.git
+</code></pre>
+
+<p>Otherwise, download the latest commit from the web interface:</p>
+
+<p><img src="media/git-clone.png" alt="snapshot"></p>
+
+<h3>
+<a id="configuring-and-building" class="anchor" href="#configuring-and-building" aria-hidden="true"><span class="octicon octicon-link"></span></a>Configuring and building</h3>
+
+<p>enter the repository and create a build directory</p>
+
+<pre><code>cd gitim  
+mkdir build
+cd build
+</code></pre>
+
+<p>There, launch cmake providing the location of your gromacs tree
+and your gromacs build (these two could coincide), for example:</p>
+
+<pre><code>cmake .. -DMYGMX_SRC=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
+</code></pre>
+
+<p>compile with </p>
+
+<pre><code>make
+</code></pre>
+
+<p>Done!</p>
+
+<p>Here is what I see on my terminal when I do a fresh install:</p>
+
+<pre><code> &gt; clear
+
+ &gt; git clone https://github.com/Marcello-Sega/gitim.git
+
+ Cloning into 'gitim'...
+ remote: Counting objects: 590, done.
+ remote: Compressing objects: 100% (43/43), done.
+ remote: Total 590 (delta 91), reused 69 (delta 69), pack-reused 478
+ Receiving objects: 100% (590/590), 2.61 MiB | 1.55 MiB/s, done.
+ Resolving deltas: 100% (322/322), done.
+ Checking connectivity... done.
+
+ &gt; cd gitim
+
+ &gt; ls
+
+ CMakeLists.txt COPYING        DISCLAIMER     HOWTO          README.md      examples       gmx_itim.cpp   maintainer     media
+
+ &gt; mkdir build
+ &gt; cd build/
+
+ &gt; cmake .. -DMYGMX_TREE=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
+
+
+ -- The CXX compiler identification is AppleClang 6.0.0.6000056
+ -- Check for working CXX compiler: /usr/bin/c++
+ -- Check for working CXX compiler: /usr/bin/c++ -- works
+ -- Detecting CXX compiler ABI info
+ -- Detecting CXX compiler ABI info - done
+ -- checking version file ~/gromacs-5.0.6/build/src/external/tng_io/include/tng/version.h
+ -- checking version file ~/gromacs-5.0.6/build/src/gromacs/version.h
+ -- ============================================================
+ -- GMX version: 50000    on    Darwin-14.5.0   
+ -- ============================================================
+ -- 
+ -- ==================================================
+ -- Using libraries: ~/gromacs-5.0.6/build/lib/libgromacs.dylib 
+ -- ==================================================
+ -- 
+ -- GMX LIB:  ~/gromacs-5.0.6/build/lib/libgromacs.dylib
+ -- Configuring done
+ -- Generating done
+ -- Build files have been written to: /tmp/gitim/build
+
+ &gt; make
+
+ Scanning dependencies of target g_itim
+ [100%] Building CXX object CMakeFiles/g_itim.dir/gmx_itim.cpp.o
+ Linking CXX executable g_itim
+ [100%] Built target g_itim
+
+ &gt; ls
+
+ CMakeCache.txt      CMakeFiles          Makefile            cmake_install.cmake examples            g_itim
+</code></pre>
+
+<hr>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/Marcello-Sega/gitim">Gitim</a> is maintained by <a href="https://github.com/Marcello-Sega">Marcello-Sega</a>.</span>
