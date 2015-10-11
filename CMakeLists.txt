@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8.11) 
-PROJECT (G_ITIM CXX) 
+PROJECT (ITIM CXX) 
 INCLUDE (CheckIncludeFiles)
 set_source_files_properties(gmx_itim.cpp PROPERTIES LANGUAGE CXX )
 list( APPEND CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS}" )
@@ -170,16 +170,16 @@ MESSAGE(STATUS "")
 # Let's tell cmake to check parameters for the examples
 
 ADD_DEFINITIONS( -O3 -Wall  -pedantic  -Wno-unused -Wuninitialized  -ffast-math )
-ADD_EXECUTABLE(g_itim gmx_itim.cpp)
+ADD_EXECUTABLE(itim gmx_itim.cpp)
 MESSAGE(STATUS "GMX LIB:  ${GROMACS_LIBGMX}")
-TARGET_LINK_LIBRARIES(g_itim pthread  ${GROMACS_LIBGMX} m dl )
+TARGET_LINK_LIBRARIES(itim pthread  ${GROMACS_LIBGMX} m dl )
 
 IF(${GMX_VERSION} VERSION_LESS 50000)
 # todo
 ELSE(${GMX_VERSION} VERSION_LESS 50000)
-	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nMAKENDX='${MYGMX_BUILD}/bin/gmx make_ndx'\nGDENS=../../g_itim\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
+	FILE (WRITE ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o/include.sh "GROMPP='${MYGMX_BUILD}/bin/gmx grompp'\nMAKENDX='${MYGMX_BUILD}/bin/gmx make_ndx'\nGDENS=../../itim\nTOPOL=topol-5.0.top\nexport GMXLIB=${MYGMX_TREE}/share/top/\n" )
 ENDIF(${GMX_VERSION} VERSION_LESS 50000)
 
-add_custom_command(TARGET  g_itim PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o $<TARGET_FILE_DIR:g_itim>/examples/ccl4-h2o)
+add_custom_command(TARGET  itim PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/examples/ccl4-h2o $<TARGET_FILE_DIR:itim>/examples/ccl4-h2o)
 
 
