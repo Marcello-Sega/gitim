@@ -6,7 +6,7 @@
 *  [Tutorial](TUTORIAL.md)
 
 # What is ITIM/GITIM?  
-<img src="media/soot1small.png" width="180" align="right" style="z-index:999;">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/soot1small.png" width="180" align="right" style="z-index:999;">
 **ITIM** and **GITIM** are two algorithms for the identification
 of interfacial molecules or atoms. GITIM is a generalization of the
 ITIM algorithm, which has been designed for planar interfaces. GITIM,
