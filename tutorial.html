@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<head>
+  <style>
+      body {
+        padding: 0;
+        margin: 0;
+        font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        line-height: 4em;
+        color: #606c71;
+      }
+      .page-header {
+            color: #fff;
+            line-height: 4em;
+            text-align: center;
+            background-color: #159957;
+            background-image: linear-gradient(120deg, #155799, #159957);
+      }
+      
+@media screen and (min-width: 64em) {
+  .page-header {
+    padding: 5rem 6rem; } }
+@media screen and (min-width: 42em) and (max-width: 64em) {
+  .page-header {
+    padding: 3rem 4rem; } }
+@media screen and (max-width: 42em) {
+  .page-header {
+    padding: 2rem 1rem; } }
+      .project-name {
+          font-size:4em;
+          color:white;
+          margin-top: 0;
+          margin-bottom: 0.1rem;
+      }
+      .project-tagline {
+        font-size:2em;
+        color:white;
+        margin-bottom: 2rem;
+        font-weight: normal;
+        opacity: 0.7;
+      }
+  </style>
+</head>
+<html>
+      <body >
+<section class="page-header">
+      <p class="project-name">GITIM/ITIM</p>
+      <p class="project-tagline"> a GROMACS tool to determine interfacial molecules</p>
+</section>
+<xmp id="README" theme="cerulean" style="display:none;"></xmp>
+<script type="text/javascript">
+        var req = new XMLHttpRequest(); 
+        req.onload = function() {
+          var xmpNode = document.getElementById('README');
+          xmpNode.appendChild(document.createTextNode(this.responseText)); 
+        }
+        req.open('GET', 'https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/TUTORIAL.md', false);
+        req.send(); 
+</script>
+<script type="text/javascript" src="http://strapdownjs.com/v/0.2/strapdown.js"></script>
+</body>
+</html>
