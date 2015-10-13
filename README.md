@@ -3,7 +3,7 @@
 ## Quick links
 *  [References](#references)
 *  [How to compile](#how-to-compile)
-*  [Tutorial](TUTORIAL.md)
+*  [Tutorial](http://marcello-sega.github.io/gitim/tutorial.html)
 
 # What is ITIM/GITIM?  
 <img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/soot1small.png" width="180" align="right" style="z-index:999;">
