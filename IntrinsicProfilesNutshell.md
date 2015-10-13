@@ -7,8 +7,7 @@ distance from the interface, but the presence of capillary waves
 induced by thermal fluctuations complicates their calculation, as
 the wave modes spectrum depends on the wave vector q as
 
-
-<img src="media/eq1.png" height="50" align="middle" alt="\langle \xi^2(q)\rangle \propto \frac{kT}{q^2}">
+![eq1](https://github.com/Marcello-Sega/gitim/blob/ITIM/media/eq1.png x50)
 
 and the larger your sample is, the larger will be the amplitude of
 compatible, long wavelength excitations. These capillary waves will
