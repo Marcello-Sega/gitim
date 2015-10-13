@@ -239,6 +239,6 @@ The options
 will be discussed in another tutorial.
 
 
-[ [Back to the Main Page](README.md) ]
+[ [Back to the Main Page](http://marcello-sega.github.io/gitim/) ]
 
-[ [Intrinsic Profiles in-a-nutshell](IntrinsicProfilesNutshell.md) ]
+[ [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/tutorial.html) ]
