@@ -241,4 +241,4 @@ will be discussed in another tutorial.
 
 [ [Back to the Main Page](http://marcello-sega.github.io/gitim/) ]
 
-[ [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/tutorial.html) ]
+[ [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html	) ]
