@@ -96,7 +96,7 @@ If you have `git` installed on your system, simply use the command
 
     git clone https://github.com/Marcello-Sega/gitim.git
 
-Otherwise, download the latest commit from the web interface:
+Otherwise, download the [latest commit from the web interface](https://github.com/Marcello-Sega/gitim)
 
 ![snapshot](https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/git-clone.png)
 
