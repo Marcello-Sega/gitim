@@ -75,8 +75,7 @@ If you use this code to publish some research results, please read and cite both
 
 [M. Sega, S. S. Kantorovich P. Jedlovszky and M. Jorge, _J. Chem. Phys._ **138**, 044110 (2013)](http://dx.doi.org/10.1063/1.4776196) The generalized identification of truly interfacial molecules (ITIM) algorithm for nonplanar interfaces.
 
-[L. B. Pártay, G. Hantal, P. Jedlovszky, Á. Vincze and G. Horvai, _J. Comp. Chem._ **29**, 945 (2008)] (http://dx.doi.org/10.1002/jcc.20852)
-A new method for determining the interfacial molecules and characterizing the surface roughness in computer simulations. Application to the liquid–vapor interface of water
+[L. B. Pártay, G. Hantal, P. Jedlovszky, Á. Vincze and G. Horvai, _J. Comp. Chem._ **29**, 945 (2008)](http://dx.doi.org/10.1002/jcc.20852) A new method for determining the interfacial molecules and characterizing the surface roughness in computer simulations. Application to the liquid–vapor interface of water
 
 -----------------
 
@@ -99,7 +98,7 @@ If you have `git` installed on your system, simply use the command
 
 Otherwise, download the latest commit from the web interface:
 
-![snapshot](media/git-clone.png)
+![snapshot](https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/git-clone.png)
 
 ###Configuring and building
 
