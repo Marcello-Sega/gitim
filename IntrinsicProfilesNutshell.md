@@ -16,7 +16,7 @@ position of the interface is in contrary known at each and every
 point, it is possible to construct profiles ρ(z) which are intrinsic
 (with respect to the interface),
 
-
+ 
 <img src="http://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/eq2.png" height="50" align="middle" alt="\rho(z) = \frac{1}{A}\Big\langle \sum_i{ \delta(z-z_i+\xi(x_i,y_i)}\Big\rangle">
 
 where the index i identifies the i-th particle in one phase, and z
