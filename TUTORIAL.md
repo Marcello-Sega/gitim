@@ -35,7 +35,7 @@ The profiles one can obtain from this single snapshot are already enough to get 
 Once GROMACS is done, you should see a file name `traj.trr`, containing 1000 trajectory snapshots.
 
 ##The first intrinsic profile
-To have a basic idea of what an intrinsic profile is, have a look at [this short introduction](IntrinsicProfilesNutshell.md)
+To have a basic idea of what an intrinsic profile is, have a look at [this short introduction](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html)
 As a first example, we are going to compute the intrinsic profile of water and CCl4, with respect to the water phase.
 The program needs to be supplied with at least one analysis group. The first group supplied is going to be the one used to define the interface. The following 1 or 2 groups are  those that will be used to compute the density profiles, in our case, water and CCl4. 
 
@@ -71,7 +71,7 @@ The result should be something similar to this:
 <img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/h2o-ccl4.png" width="480" align="middle" alt="H2O / CCl4 intrinsic  mass density profile">
 
 But first you need to understand the structure of the output file
-(BTW, you can check the [Intrinsic Profiles in-a-nutshell](IntrinsicProfilesNutshell.md) page for a short discussion on the meaning of this profile).
+(BTW, you can check the [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html) page for a short discussion on the meaning of this profile).
 
 ##Dissecting the output file
 
@@ -241,4 +241,4 @@ will be discussed in another tutorial.
 
 [ [Back to the Main Page](http://marcello-sega.github.io/gitim/) ]
 
-[ [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html	) ]
+[ [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html) ]
