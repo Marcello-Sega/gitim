@@ -3,10 +3,10 @@
 ## Quick links
 *  [References](#references)
 *  [How to compile](#how-to-compile)
-*  [Tutorial](TUTORIAL.md)
+*  [Tutorial](http://marcello-sega.github.io/gitim/tutorial.html)
 
 # What is ITIM/GITIM?  
-<img src="media/soot1small.png" width="180" align="right" style="z-index:999;">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/soot1small.png" width="180" align="right" style="z-index:999;">
 **ITIM** and **GITIM** are two algorithms for the identification
 of interfacial molecules or atoms. GITIM is a generalization of the
 ITIM algorithm, which has been designed for planar interfaces. GITIM,
@@ -75,8 +75,7 @@ If you use this code to publish some research results, please read and cite both
 
 [M. Sega, S. S. Kantorovich P. Jedlovszky and M. Jorge, _J. Chem. Phys._ **138**, 044110 (2013)](http://dx.doi.org/10.1063/1.4776196) The generalized identification of truly interfacial molecules (ITIM) algorithm for nonplanar interfaces.
 
-[L. B. Pártay, G. Hantal, P. Jedlovszky, Á. Vincze and G. Horvai, _J. Comp. Chem._ **29**, 945 (2008)] (http://dx.doi.org/10.1002/jcc.20852)
-A new method for determining the interfacial molecules and characterizing the surface roughness in computer simulations. Application to the liquid–vapor interface of water
+[L. B. Pártay, G. Hantal, P. Jedlovszky, Á. Vincze and G. Horvai, _J. Comp. Chem._ **29**, 945 (2008)](http://dx.doi.org/10.1002/jcc.20852) A new method for determining the interfacial molecules and characterizing the surface roughness in computer simulations. Application to the liquid–vapor interface of water
 
 -----------------
 
@@ -97,9 +96,9 @@ If you have `git` installed on your system, simply use the command
 
     git clone https://github.com/Marcello-Sega/gitim.git
 
-Otherwise, download the latest commit from the web interface:
+Otherwise, download the [latest commit from the web interface](https://github.com/Marcello-Sega/gitim)
 
-![snapshot](media/git-clone.png)
+![snapshot](https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/git-clone.png)
 
 ###Configuring and building
 

@@ -11,7 +11,7 @@ In this tutorial you will learn how to:
 ##Water / Carbon Tetrachloride
 
 
-<img src="media/H2O_CCl4_snap-cut.jpeg" width="100%" align="middle" alt="H2O / CCl4 interface">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/H2O_CCl4_snap-cut.jpeg" width="100%" align="middle" alt="H2O / CCl4 interface">
 
 In the `examples/ccl4/` directory of your _build_ directory, there are all the necessary files to run simple test on a single frame from a H2O/CCl4 snapshot. You can test them all by launching the RUN.sh script (remember, from the _build_ directory, not from the source one!) 
 If everything goes fine, you should see something like:
@@ -35,7 +35,7 @@ The profiles one can obtain from this single snapshot are already enough to get 
 Once GROMACS is done, you should see a file name `traj.trr`, containing 1000 trajectory snapshots.
 
 ##The first intrinsic profile
-To have a basic idea of what an intrinsic profile is, have a look at [this short introduction](IntrinsicProfilesNutshell.md)
+To have a basic idea of what an intrinsic profile is, have a look at [this short introduction](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html)
 As a first example, we are going to compute the intrinsic profile of water and CCl4, with respect to the water phase.
 The program needs to be supplied with at least one analysis group. The first group supplied is going to be the one used to define the interface. The following 1 or 2 groups are  those that will be used to compute the density profiles, in our case, water and CCl4. 
 
@@ -68,10 +68,10 @@ In addition, there is a set of flags, which are specific for `g_itim`, namely:
 
 The result should be something similar to this:
 
-<img src="media/h2o-ccl4.png" width="480" align="middle" alt="H2O / CCl4 intrinsic  mass density profile">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/h2o-ccl4.png" width="480" align="middle" alt="H2O / CCl4 intrinsic  mass density profile">
 
 But first you need to understand the structure of the output file
-(BTW, you can check the [Intrinsic Profiles in-a-nutshell](IntrinsicProfilesNutshell.md) page for a short discussion on the meaning of this profile).
+(BTW, you can check the [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html) page for a short discussion on the meaning of this profile).
 
 ##Dissecting the output file
 
@@ -144,7 +144,7 @@ If you want to draw the simulation box, you should take care of centering it wit
 
 The system will then be looking similar to this, using VdW as a representation:
 
-<img src="media/vmd-snap1.jpg" width="480" align="middle">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/vmd-snap1.jpg" width="480" align="middle">
 
 If you open the `layers.pdb` files with a text editor, you will notice that also the `occupancy` and `temperature` fields are used, for example:
 
@@ -161,7 +161,7 @@ This file format can be very useful to perform analysis which are not allowed by
 
 As a next excercise, we are going to mark the surface atoms, and draw all other water atoms with a color that depends on the intrinsic surface. This can be done in vmd by adding a representation, and using `occupancy 1` in the `Selected atoms` field for the surface atoms, that are here drawn using slightly larger VdW radii of gray color, and by selecting `Beta` as a `Coloring method` for the other representation (`Selected atoms` being `all` in this case).
 
-<img src="media/vmd-snap2.jpg" width="800" align="middle">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/vmd-snap2.jpg" width="800" align="middle">
 
 One can notice the presence of a curious spike of the color ramp
 on one face of the simulation box. This coincides with the presence
@@ -187,7 +187,7 @@ In addition to the three groups, three cut-off parameters (in nm) will have to b
 Where we have chosen a cutoff of 0.35 nm for all species, corresponding to the first minimum of the radial distribution function of water Oxygens.
 This way, the water molecule solvated in the CCl4 phase is not recognized anymore as a surface one, and the distribution of distances does not show anymore the artifact:
 
-<img src="media/vmd-snap3.jpg" width="480" align="middle">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/vmd-snap3.jpg" width="480" align="middle">
 
 
 ##Successive and molecular layers
@@ -214,7 +214,7 @@ Let's try to analyze the first 4 layers with the command
 In the following figure, we show just the sencond layer, by choosing `occupancy 2` in the `Selected Atoms` mask, and we show the res (`all`) as transparent spheres. 
 
 
-<img src="media/vmd-snap4.jpg" width="480" align="middle">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/vmd-snap4.jpg" width="480" align="middle">
 
 On notices immediately that the second layer has an odd composition: Hydrogen atoms in the outer part of the layer, and Oxygen atoms in the inner one. This happens because, once the first layer atoms (Oxygens) are removed, the Hydrogen atoms are exposed to the probe spheres and detected as surface atoms. This if of course completely fine from the point of view of the algorithm, but probably does not reflect the expectations of what the second layer should look like, precisely because we have taken into account, so far, only atoms an not molecules. The molecular-based version of the algorithm can be the switched on using the `-mol` flag, so that as soon as an atom is detected as surface one, all other atoms in the corresponding molecule are also tagged as surface ones. The command line now reads:
 
@@ -223,7 +223,7 @@ On notices immediately that the second layer has an odd composition: Hydrogen at
 
 and the first three molecular layers looks like this (now coloring Hydrogen and Oxygen atoms using the same color to distinguish the layers):
 
-<img src="media/vmd-snap5.jpg" width="480" align="middle">
+<img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/vmd-snap5.jpg" width="480" align="middle">
 
 
 Notice that, again, for water only, this problem could have been avoided by using only water Oxygens as support group, and the complete water molecules as one of the analysis groups. This, however, is not possible in case of more complex molecules, and for this reason it is possible in `g_itim` to decide whether to use an atom-based or molecule-based surface (and layers) identification. It is up to the user to decide what fits better to his/her needs.
@@ -239,6 +239,6 @@ The options
 will be discussed in another tutorial.
 
 
-[ [Back to the Main Page](README.md) ]
+[ [Back to the Main Page](http://marcello-sega.github.io/gitim/) ]
 
-[ [Intrinsic Profiles in-a-nutshell](IntrinsicProfilesNutshell.md) ]
+[ [Intrinsic Profiles in-a-nutshell](http://marcello-sega.github.io/gitim/IntrinsicProfileNutshell.html) ]
