@@ -2625,7 +2625,7 @@ int compute_intrinsic_surface(int bCluster, matrix box, int ngrps, rvec * gmx_co
 	if(itim->info)fprintf(stdout,"Number of surface elements = %d\n",itim->nalphapoints);
 	return 1;
 }
-
+#if 0
 void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt, t_trxframe * fr){  
 	int i,j,n;
 	real pos,r, tmpreal;
@@ -2695,6 +2695,7 @@ void compute_layer_profile(matrix box,atom_id ** gmx_index_phase,t_topology * to
              break;
         }
 }
+#endif
 
 void compute_histogram(matrix box,atom_id ** gmx_index_phase,t_topology * top, char dens_opt, t_trxframe * fr){  
 /*************************************
@@ -2914,16 +2915,16 @@ This is too cluttered. Reorganize the code...
 			   if(atomic_layer>0){
 				//printf("phase_index = %d\n",phase_index);
 		 	   	sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,phase_index,atomic_layer,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
-		 	   	sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,phase_index,atomic_layer,ATOMIC,__LINE__), p4[2], histo, itim,(real)(locmass));
+		 	   	sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,phase_index,atomic_layer,ATOMIC,__LINE__), p4[2], histo, itim,2.*(real)(locmass));
 			   }
 			   if(molecular_layer>0){
 			   	sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,phase_index,molecular_layer,MOLECULAR,__LINE__), dist, histo, itim,(real)(locmass));
-			   	sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,phase_index,molecular_layer,MOLECULAR,__LINE__), p4[2], histo, itim,(real)(locmass));
+			   	sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,phase_index,molecular_layer,MOLECULAR,__LINE__), p4[2], histo, itim,2*(real)(locmass));
 			   }
 			}
 		 } else { 
 		 	   sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,j,0,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
-		 	   sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,j,0,ATOMIC,__LINE__),p4[2], histo, itim,(real)(locmass));
+		 	   sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,j,0,ATOMIC,__LINE__),p4[2], histo, itim,2*(real)(locmass));
 		 }
 #endif
                  //printf("SAMPLING %d %d %f %d\n",i,sampled,locmass,check+=locmass);
@@ -3243,7 +3244,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
                /* TODO: decide if the density of test lines (0.04) should be hardcoded or not.*/
 	FILE * statfile = fopen("stats.dat","w");
 	for(int i = 0 ; i < itim->maxlayers ; i++ ){
-		fprintf(statfile, "# surface_density");
+		fprintf(statfile, "# surface_density ");
 #ifdef VIRIAL_EXTENSION
 		fprintf(statfile,"f_x f_y f_z ");
 		fprintf(statfile, "pres_x pres_y pres_z ");
@@ -3264,6 +3265,10 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 #endif //UNIX
 		x0 = fr.x;	
         	natoms = fr.natoms;
+#if 0
+		printf("frame\n");
+		for(int i=0;i<natoms;i++) printf("%f %f %f - %f %f %f\n",fr.x[i][0],fr.x[i][1],fr.x[i][2],fr.vir[i][0],fr.vir[i][1],fr.vir[i][2]);
+#endif
 		for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
     		gmx_rmpbc(gpbc,natoms,box,x0);
         	set_pbc(&pbc, ePBC, box);
@@ -3299,7 +3304,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		    }
 		    /* Compute the intrinsic profile */
 	            if(dens_opt!='s') {  
-		       compute_layer_profile(box, index, top, dens_opt, & fr ); 
+		       //compute_layer_profile(box, index, top, dens_opt, & fr ); 
 		       collect_statistics_for_layers(itim,&fr);
  		       compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
                     }
@@ -3507,7 +3512,6 @@ geometry[0]=geometry[1];
   snew(CLUSTERCUT,ngrps); 
 
   get_index(&top->atoms,ftp2fn_null(efNDX,NFILE,fnm),ngrps+ngrps_add,ngx,index,grpname); 
-
   for(i=0;i<64;i++) com_opt[i]=0;
   if (ngrps>=64) exit(printf("Error, too many groups\n"));
   if(bCom) { 
