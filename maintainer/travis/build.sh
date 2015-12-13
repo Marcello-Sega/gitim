@@ -81,7 +81,7 @@ cmd "mv gromacs-${GMX} gromacs"
 cmd "mkdir gromacs/build"
 (
  cmd "cd gromacs/build" || exit $?
- cmd "cmake .. -DGMX_FFT_LIBRARY=fftpack" || exit $? 
+ cmd "cmake .. -DGMX_FFT_LIBRARY=fftpack -DGMX_GPU=OFF" || exit $? 
  cmd "make" || exit $? 
 ) 
 end "GROMACS BUILD"
