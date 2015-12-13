@@ -3460,7 +3460,7 @@ geometry[0]=geometry[1];
 #if GMX_VERSION >= 50000
   for(int iarg=0; iarg < argc ; iarg ++ ) { // this is horrible, but couldn't get the hang of the new parse_common_args()
 	if(!strcmp(argv[iarg],"-h")){
-#if GMX_VERSION <= 50100
+#if GMX_VERSION < 50100
             gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL);
 #else
             gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL,"itim");
