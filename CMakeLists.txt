@@ -119,9 +119,10 @@ ENDIF()
 	ELSE( CMAKE_HOST_SYSTEM MATCHES Darwin)
 		SET (DYNAMIC_LIBFILE libgromacs.so)
 	ENDIF( CMAKE_HOST_SYSTEM MATCHES Darwin)
+
 ENDIF(${GMX_VERSION} VERSION_LESS 50000) 
 
-### endof version-dependent part
+### find libraries 
 
 FIND_PATH(GROMACS_LIBGMX_STATIC NAMES ${STATIC_LIBFILE} PATHS ${MYPATHS})
 FIND_PATH(GROMACS_LIBGMX_DYNAMIC NAMES ${DYNAMIC_LIBFILE} PATHS ${MYPATHS})
@@ -136,7 +137,6 @@ ENDIF(GROMACS_LIBGMX_STATIC)
 IF(GROMACS_LIBGMX_DYNAMIC)
 	SET(GROMACS_LIBGMX "${GROMACS_LIBGMX_DYNAMIC}/${DYNAMIC_LIBFILE}")
 ENDIF(GROMACS_LIBGMX_DYNAMIC)
-
 
         
 SET (SUFFIXES gmxana gmxlib math fileio pbcutil legacyheaders selection utility pbcutil boost)
@@ -160,6 +160,53 @@ ENDFOREACH(HEADER)
 IF(NOT GROMACS_LIBGMX)
    MESSAGE(FATAL_ERROR "Unable to find libraries")
 ENDIF(NOT GROMACS_LIBGMX)
+
+## check source for gromacs helpcontext interface
+get_property(inc_dirs DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
+SET(CMAKE_REQUIRED_INCLUDES "${inc_dirs}")
+SET(CMAKE_REQUIRED_LIBRARIES "${GROMACS_LIBGMX}")
+INCLUDE(CheckCXXSourceCompiles) 
+
+unset(HAVE_NEW_GMX_CONTEXT_INTERFACE CACHE)
+unset(HAVE_OLD_GMX_CONTEXT_INTERFACE CACHE)
+CHECK_CXX_SOURCE_COMPILES(
+"
+#include \"gromacs/commandline/cmdlinemodulemanager.h\"
+#include \"gromacs/commandline/cmdlinehelpcontext.h\"
+#include \"file.h\"
+int
+main()
+{
+            gmx::CommandLineHelpContext context(&gmx::File::standardError(),
+			gmx::eHelpOutputFormat_Console, NULL,\"itim\");
+}
+" HAVE_NEW_GMX_CONTEXT_INTERFACE)
+
+
+CHECK_CXX_SOURCE_COMPILES(
+"
+#include \"gromacs/commandline/cmdlinemodulemanager.h\"
+#include \"gromacs/commandline/cmdlinehelpcontext.h\"
+#include \"file.h\"
+int
+main()
+{
+            gmx::CommandLineHelpContext context(&gmx::File::standardError(),
+			gmx::eHelpOutputFormat_Console, NULL);
+}
+" HAVE_OLD_GMX_CONTEXT_INTERFACE)
+
+
+IF(NOT HAVE_NEW_GMX_CONTEXT_INTERFACE)
+  IF(NOT HAVE_OLD_GMX_CONTEXT_INTERFACE)
+    MESSAGE(FATAL_ERROR "No working interface for help found")
+  ENDIF(NOT HAVE_OLD_GMX_CONTEXT_INTERFACE)
+ENDIF(NOT HAVE_NEW_GMX_CONTEXT_INTERFACE)
+
+
+IF(HAVE_NEW_GMX_CONTEXT_INTERFACE)
+ ADD_DEFINITIONS(-DNEW_CONTEXT_INTERFACE)
+ENDIF(HAVE_NEW_GMX_CONTEXT_INTERFACE)
 	
 
 MESSAGE(STATUS "")
@@ -170,8 +217,14 @@ MESSAGE(STATUS "")
 
 
 # Let's tell cmake to check parameters for the examples
+ADD_DEFINITIONS(-Wall  -pedantic  -Wno-unused -Wuninitialized )
+IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+ADD_DEFINITIONS( -O0 )
+ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
+ADD_DEFINITIONS( -O3 -ffast-math )
+ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
-ADD_DEFINITIONS( -O3 -Wall  -pedantic  -Wno-unused -Wuninitialized  -ffast-math )
+
 ADD_EXECUTABLE(itim gmx_itim.cpp)
 MESSAGE(STATUS "GMX LIB:  ${GROMACS_LIBGMX}")
 TARGET_LINK_LIBRARIES(itim pthread  ${GROMACS_LIBGMX} m dl )

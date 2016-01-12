@@ -1209,7 +1209,6 @@ int GET_HISTO_INDEX(HISTO_TYPE TYPE,int phase, int layer, int molecular, int lin
                 exit(printf("Internal error: order profiles to be checked\n"));
         } 
        if(TYPE==COMPUTE_SIZE){
-			printf("%d size index=%d\n",line,index);
        	return index;   	
        } else { 
 	   return -1000;
@@ -2753,12 +2752,14 @@ This is too cluttered. Reorganize the code...
 
 	int isizem, *indexm,*backindex;
 	int molecular_layer,atomic_layer;
-	isizem=itim->n[j];
-	snew(indexm,isizem);
-	snew(backindex,top->mols.nr+1);
+        if(itim->bMol) { 
+		isizem=itim->n[j];
+		snew(indexm,isizem);
+		snew(backindex,top->mols.nr+1);
+	}
 
 
-	if(!(j==itim->RANDOM_PHASE && itim->bMCnormalization)) {
+	if(!(j==itim->RANDOM_PHASE && itim->bMCnormalization) && itim->bMol ) {
 		for(i=0;i<itim->n[j];i++) indexm[i]=itim->gmx_index[j][i]; // NOTE: TODO check "additional"  under the PATCH case
                 spol_atom2molindex(&isizem, indexm,backindex, &(top->mols));
 	}
@@ -2769,20 +2770,22 @@ This is too cluttered. Reorganize the code...
                 real locmass=0.0,locm,locnumber;
                 rvec v1,v2,vm,vn,newpos,oldpos;
 		if(j==SUPPORT_PHASE){
-			int mol = indexm[i];
-			int i1 = backindex[mol] ;
-			int i2 = backindex[mol+1];
-			if(i2==-1) i2=itim->n[SUPPORT_PHASE]; // i2==-1 in case of last atom.
-			int minlayer=123456;
-			int k;
-			for(k=i1;k<i2;k++){
-				if (itim->mask[k] >0 && itim->mask[k] < minlayer ) { 
-					minlayer = itim->mask[k];
-				}
-			}	
-			// with the molecular layer we add all atoms belonging to the same molecule into 
-                        // the outermost layer associated to any of the molecule's atoms. Clear, uh?
-			molecular_layer= ( (minlayer==123456) ? 0 :minlayer) ;	
+			if(itim->bMol) { 
+			   int mol = indexm[i];
+			   int i1 = backindex[mol] ;
+			   int i2 = backindex[mol+1];
+			   if(i2==-1) i2=itim->n[SUPPORT_PHASE]; // i2==-1 in case of last atom.
+			   int minlayer=123456;
+			   int k;
+			   for(k=i1;k<i2;k++){
+			   	if (itim->mask[k] >0 && itim->mask[k] < minlayer ) { 
+			   		minlayer = itim->mask[k];
+			   	}
+			   }	
+			   // with the molecular layer we add all atoms belonging to the same molecule into 
+                           // the outermost layer associated to any of the molecule's atoms. Clear, uh?
+			   molecular_layer= ( (minlayer==123456) ? 0 :minlayer) ;	
+			}
 			atomic_layer =itim->mask[i]; 
 		}
                 if(itim->com_opt[j]) {
@@ -2919,7 +2922,7 @@ This is too cluttered. Reorganize the code...
 		 	   	sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,phase_index,atomic_layer,ATOMIC,__LINE__), dist, histo, itim,(real)(locmass));
 		 	   	sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,phase_index,atomic_layer,ATOMIC,__LINE__), p4[2], histo, itim,2.*(real)(locmass));
 			   }
-			   if(molecular_layer>0){
+			   if(molecular_layer>0 && itim->bMol){
 			   	sampled=populate_histogram(GET_HISTO_INDEX(INTRINSIC_DENSITY,phase_index,molecular_layer,MOLECULAR,__LINE__), dist, histo, itim,(real)(locmass));
 			   	sampled=populate_histogram(GET_HISTO_INDEX(LAYER_DISTRIBUTION,phase_index,molecular_layer,MOLECULAR,__LINE__), p4[2], histo, itim,2*(real)(locmass));
 			   }
@@ -2949,8 +2952,10 @@ This is too cluttered. Reorganize the code...
                     }
 #endif
 	}
-	free(indexm);
-	free(backindex);
+	if(itim->bMol) { 
+	   free(indexm);
+	   free(backindex);
+	}
     }
 #ifdef TIME_PROFILE
     gettimeofday(&tp2, NULL);
@@ -3292,7 +3297,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
                 }
                 /* Identify the atom,tops belonging to the intrinsic surface */
 	        int success = compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
-		printf("time=%.3f\n",fr.time);
+		if(itim->info) printf("time=%.3f\n",fr.time);
 		if (!success && getenv("NO_IDENTIFICATION_ERROR")==NULL) exit(0);
 		if (success) { 
 		    if(bDumpPhases) { 
@@ -3462,7 +3467,7 @@ geometry[0]=geometry[1];
 #if GMX_VERSION >= 50000
   for(int iarg=0; iarg < argc ; iarg ++ ) { // this is horrible, but couldn't get the hang of the new parse_common_args()
 	if(!strcmp(argv[iarg],"-h")){
-#if GMX_VERSION >= 50100
+#if defined(NEW_CONTEXT_INTERFACE)
             gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL,"itim");
 #else
             gmx::CommandLineHelpContext context(&gmx::File::standardError(), gmx::eHelpOutputFormat_Console, NULL);
