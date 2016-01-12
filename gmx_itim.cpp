@@ -1674,6 +1674,7 @@ int compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,
 #endif
         /* The positive side */
         i=0;
+        result=1;
 	do { 
 		index = itim->phase_index[SUPPORT_PHASE][i];
 		if(is_in_correct_phase(index)){
@@ -1685,6 +1686,7 @@ int compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
 	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
         i = 0;
+        result=1;
 	itim->side=-1;
 	qsort((void*)itim->phase_index[SUPPORT_PHASE], itim->n[SUPPORT_PHASE], sizeof(int) , projection_negative);
 	do { 
