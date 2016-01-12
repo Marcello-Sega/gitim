@@ -81,75 +81,7 @@ cmd "mv gromacs-${GMX} gromacs"
 cmd "mkdir gromacs/build"
 (
  cmd "cd gromacs/build" || exit $?
- cmd "cmake .. -DGMX_FFT_LIBRARY=fftpack -DGMX_GPU=OFF" || exit $? 
+ cmd "cmake .. -DGMX_FFT_LIBRARY=fftpack -DGMX_GPU=OFF -DGMX_SIMD=SSE4.1" || exit $? 
  cmd "make" || exit $? 
 ) 
 end "GROMACS BUILD"
-# CONFIGURE
-# # start "CONFIGURE"
-# # 
-# # if $with_mpi; then
-# #     configure_params="--with-mpi $configure_params"
-# #     configure_vars="CXX=mpic++"
-# # else
-# #     configure_params="--without-mpi $configure_params"
-# # fi
-# # 
-# # FFTW_HEADER=$srcdir/src/core/fftw3.h
-# # if $with_fftw; then
-# #     configure_params="--with-fftw $configure_params"
-# # else
-# #     configure_params="--without-fftw $configure_params"
-# #     echo "Not using FFTW => generating mock $FFTW_HEADER..."
-# #     echo "#error ERROR: fftw is not really present but used somewhere." \
-# #         > $FFTW_HEADER
-# # fi
-# # 
-# # if $with_tcl; then
-# #     configure_params="--with-tcl $configure_params"
-# # else
-# #     configure_params="--without-tcl $configure_params"
-# # fi
-# # 
-# # if $with_python_interface; then
-# #     configure_params="--with-python-interface $configure_params"
-# # else
-# #     configure_params="--without-python-interface $configure_params"
-# # fi
-# # 
-# # cmd "$srcdir/configure $configure_params $configure_vars" || exit $?
-# # end "CONFIGURE"
-# # 
-# # # BUILD
-# # start "BUILD"
-# # 
-# # MYCONFIG_DIR=$srcdir/maintainer/jenkins/configs
-# # if [ "$myconfig" = "default" ]; then
-# #     echo "Using default myconfig."
-# # else
-# #     myconfig_file=$MYCONFIG_DIR/$myconfig.hpp
-# #     if [ ! -e "$myconfig_file" ]; then
-# #         echo "$myconfig_file does not exist!"
-# #         exit 1
-# #     fi
-# #     echo "Copying $myconfig.hpp to $builddir/myconfig.hpp..."
-# #     cp $myconfig_file $builddir/myconfig.hpp
-# # fi
-# # 
-# # cmd "make" || exit $?
-# # 
-# # end "BUILD"
-# # 
-# # # CHECK
-# # if $make_check; then
-# #     start "TEST"
-# # 
-# #     cmd "make check $make_params"
-# #     ec=$?
-# #     if [ $ec != 0 ]; then
-# #         cat $srcdir/testsuite/runtest.log
-# #         exit $ec
-# #     fi
-# # 
-# #     end "TEST"
-# # fi
