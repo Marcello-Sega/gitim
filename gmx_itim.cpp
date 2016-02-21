@@ -1341,23 +1341,34 @@ void arrange_bulk_points (int Bulk_nelem, real * Bulk_points, GEOMETRY geometry,
 
 void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	int i,layer,atom_index,phase_index;
-	real * f,*vir;
+	real * f,*vir,*J;
+	real Jtot[3];
 	int *n;
 	FILE*fp;
 	n   = (int*)malloc(itim->maxlayers * sizeof(int));
 	f   = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
 	vir = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
+	J   = (real*)malloc((itim->maxlayers+1) * 3 * sizeof(real));
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		n[i]=0;
 		f[3*i]=f[3*i+1]=f[3*i+2]=0.0;
 		vir[3*i]=vir[3*i+1]=vir[3*i+2]=0.0;
+		J[3*i]=J[3*i+1]=J[3*i+2]=0.0;
+		J[3*(i+1)]=J[3*(i+1)+1]=J[3*(i+1)+2]=0.0;
 	}
+	Jtot[0]=Jtot[1]=Jtot[2]=0.0;
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
 	       atom_index = itim->gmx_index[SUPPORT_PHASE][i];
                double m = itim->masses[atom_index];
+	       Jtot[0] += fr->v[atom_index][0] * itim->charges[atom_index];
+	       Jtot[1] += fr->v[atom_index][1] * itim->charges[atom_index];
+	       Jtot[2] += fr->v[atom_index][2] * itim->charges[atom_index];
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
+	         J[3*layer+0] += fr->v[atom_index][0] * itim->charges[atom_index];
+	         J[3*layer+1] += fr->v[atom_index][1] * itim->charges[atom_index];
+	         J[3*layer+2] += fr->v[atom_index][2] * itim->charges[atom_index];
 #ifdef VIRIAL_EXTENSION
                  f[3*layer]   += fr->f[atom_index][0];
                  f[3*layer+1] += fr->f[atom_index][1];
@@ -1374,15 +1385,18 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	real volume =  surface * itim->box[2];
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		fprintf(fp, "%f ",n[i]/surface);
+		fprintf(fp,"%f %f %f ", J[3*i],J[3*i+1],J[3*i+2]);
 #ifdef VIRIAL_EXTENSION
 		fprintf(fp,"%f %f %f ", f[3*i]/surface,f[3*i+1]/surface,f[3*i+2]/surface);
 		fprintf(fp, "%f %f %f ",vir[3*i]/volume,vir[3*i+1]/volume,vir[3*i+2]/volume);
 #endif
         }
+	fprintf(fp,"%f %f %f ", Jtot[i],Jtot[1],Jtot[2]);
 	fprintf(fp, "\n");
 	fclose(fp);
 	free(n);
 	free(f);
+	free(J);
 	free(vir);
 }
 
@@ -3233,7 +3247,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 #ifdef VIRIAL_EXTENSION
 	flags = TRX_NEED_X | TRX_READ_V |  TRX_READ_F ;
 #else
-	flags = TRX_NEED_X ;
+	flags = TRX_NEED_X | TRX_NEED_V ;
 #endif
 
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
