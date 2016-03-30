@@ -41,7 +41,12 @@ before_script:
  - ./maintainer/travis/build.sh
  - mkdir build
  - cd build
- - cmake .. -DMYGMX_TREE=gromacs -DMYGMX_BUILD=gromacs/build 
+ - cmake .. -DMYGMX_TREE=gromacs -DMYGMX_BUILD=gromacs/build  ; ../maintainer/travis/dump_logs.sh
+
+after_error:
+ - $TRAVIS_BUILD_DIR/maintainer/travis/dump_logs.sh
+after_failure:
+ - $TRAVIS_BUILD_DIR/maintainer/travis/dump_logs.sh
 
 script:  make
 
@@ -76,3 +81,5 @@ compiler:
 #    - compiler: clang
 #      env: with-mpi=false myconfig=maxset without-cuda
 #
+
+
