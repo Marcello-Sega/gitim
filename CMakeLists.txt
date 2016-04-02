@@ -248,6 +248,16 @@ ENDIF(HAVE_NEW_GMX_CONTEXT_INTERFACE)
 ENDIF(NOT ${GMX_VERSION} VERSION_LESS 50000) 
 	
 
+# Let's check which precision we need with some heuristics..
+STRING(REGEX MATCH ".*_d.*" USE_DOUBLE ${GROMACS_LIBGMX})
+IF(USE_DOUBLE)
+	MESSAGE(STATUS "Using double precision")
+	ADD_DEFINITIONS(-DGMX_DOUBLE)
+ELSE(USE_DOUBLE)
+	MESSAGE(STATUS "Using single precision")
+ENDIF(USE_DOUBLE)
+
+
 MESSAGE(STATUS "")
 MESSAGE(STATUS "=========================================================================")
 MESSAGE(STATUS "Using libraries: ${GROMACS_LIBGMX} ")
