@@ -275,7 +275,9 @@ ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
 ADD_EXECUTABLE(itim gmx_itim.cpp)
+ADD_EXECUTABLE(dump_vir gmx_dump_vir.cpp)
 TARGET_LINK_LIBRARIES(itim pthread  ${GROMACS_LIBGMX} m dl )
+TARGET_LINK_LIBRARIES(dump_vir pthread  ${GROMACS_LIBGMX} m dl )
 
 IF(${GMX_VERSION} VERSION_LESS 50000)
 # todo

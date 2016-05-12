@@ -3228,9 +3228,6 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
   	gmx_rmpbc_t  gpbc=NULL;
 	t_pbc  pbc;
 
-	radii = load_radii(top);
-//        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
-//          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
 #ifdef VIRIAL_EXTENSION
 	flags = TRX_NEED_X | TRX_READ_V |  TRX_READ_F ;
 #else
@@ -3240,28 +3237,8 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
           gmx_fatal(FARGS,"Error loading the trajectory\n");
 
-	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
-        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add, bMol,top,bInfo); 
-
-	if(bDumpPhases){
-        	phase_cid=fopen("phase.gro","w");
-        	phase2_cid=fopen("phase2.gro","w");
-	}
-
 
                /* TODO: decide if the density of test lines (0.04) should be hardcoded or not.*/
-	FILE * statfile = fopen("stats.dat","w");
-	for(int i = 0 ; i < itim->maxlayers ; i++ ){
-		fprintf(statfile, "# surface_density ");
-#ifdef VIRIAL_EXTENSION
-		fprintf(statfile,"f_x f_y f_z ");
-		fprintf(statfile, "pres_x pres_y pres_z ");
-#endif
-	}
-	fprintf(statfile, "# \n");
-
-	fclose(statfile);
-	if(bInclusive) check_inclusive_conditions(index, gnx);
   	gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
@@ -3273,10 +3250,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 #endif //UNIX
 		x0 = fr.x;	
         	natoms = fr.natoms;
-#if 0
-		printf("frame\n");
-		for(int i=0;i<natoms;i++) printf("%f %f %f - %f %f %f\n",fr.x[i][0],fr.x[i][1],fr.x[i][2],fr.vir[i][0],fr.vir[i][1],fr.vir[i][2]);
-#endif
+
 		for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
     		gmx_rmpbc(gpbc,natoms,box,x0);
         	set_pbc(&pbc, ePBC, box);
@@ -3297,46 +3271,11 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
       			center_coords(&top->atoms,box,x0,axis,index[1],gnx[1]);
                 }
                 /* Identify the atom,tops belonging to the intrinsic surface */
-	        int success = compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
-		if(itim->info) printf("time=%.3f\n",fr.time);
-		if (!success && getenv("NO_IDENTIFICATION_ERROR")==NULL) exit(0);
-		if (success) { 
-		    if(bDumpPhases) { 
-	                itim->dump_phase_points(INNER_PHASE,top,phase_cid);  // gh
-	                itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); // gh
-                    }
-		    if(bDump){
-	   	        dump_slabs(top,0); 
-			//if(bMol)
-		    	 //  dump_slabs(top,1);
-		    }
-		    /* Compute the intrinsic profile */
-	            if(dens_opt!='s') {  
-		       //compute_layer_profile(box, index, top, dens_opt, & fr ); 
-		       collect_statistics_for_layers(itim,&fr);
- 		       compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
-                    }
-		} else {printf("Skipping frame %f\n",fr.time);}
-
+		for(int i=0;i<natoms;i++) { 
+			printf("%d   %f %f %f   %f %f %f\n",i,x0[i][0],x0[i][1],x0[i][2],fr.vir[i][0],fr.vir[i][1],fr.vir[i][2]);
+		}
   	} while (read_next_frame(oenv,status,&fr) &&  (global_interrupt == 0) );
         gmx_rmpbc_done(gpbc);
-
-        if(surf_cid  !=NULL)fclose(surf_cid);
-        if(surfmol_cid!=NULL)fclose(surfmol_cid);
-        if(phase_cid  !=NULL)fclose(phase_cid);
-        if(phase2_cid !=NULL)fclose(phase2_cid);
-
-	if(dens_opt!='s')   
-	   finalize_intrinsic_profile(slDensity, nslices, slWidth);
-#ifdef INTEGER_HISTO
-        for(int j=INNER_PHASE;j<itim->nphases;j++){
-             char fname[4096];
-             sprintf(fname,"intHist.%d.dat",j);
-             FILE * cid=fopen(fname,"w");
-             dump_int_histo(j,cid);
-        }
-#endif
-	free_profile(slDensity);	
 }
 
 void free_profile(real *** density){
