@@ -1341,34 +1341,23 @@ void arrange_bulk_points (int Bulk_nelem, real * Bulk_points, GEOMETRY geometry,
 
 void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	int i,layer,atom_index,phase_index;
-	real * f,*vir,*J;
-	real Jtot[3];
+	real * f,*vir;
 	int *n;
 	FILE*fp;
 	n   = (int*)malloc(itim->maxlayers * sizeof(int));
 	f   = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
 	vir = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
-	J   = (real*)malloc((itim->maxlayers+1) * 3 * sizeof(real));
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		n[i]=0;
 		f[3*i]=f[3*i+1]=f[3*i+2]=0.0;
 		vir[3*i]=vir[3*i+1]=vir[3*i+2]=0.0;
-		J[3*i]=J[3*i+1]=J[3*i+2]=0.0;
-		J[3*(i+1)]=J[3*(i+1)+1]=J[3*(i+1)+2]=0.0;
 	}
-	Jtot[0]=Jtot[1]=Jtot[2]=0.0;
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
 	       atom_index = itim->gmx_index[SUPPORT_PHASE][i];
                double m = itim->masses[atom_index];
-	       Jtot[0] += fr->v[atom_index][0] * itim->charges[atom_index];
-	       Jtot[1] += fr->v[atom_index][1] * itim->charges[atom_index];
-	       Jtot[2] += fr->v[atom_index][2] * itim->charges[atom_index];
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
-	         J[3*layer+0] += fr->v[atom_index][0] * itim->charges[atom_index];
-	         J[3*layer+1] += fr->v[atom_index][1] * itim->charges[atom_index];
-	         J[3*layer+2] += fr->v[atom_index][2] * itim->charges[atom_index];
 #ifdef VIRIAL_EXTENSION
                  f[3*layer]   += fr->f[atom_index][0];
                  f[3*layer+1] += fr->f[atom_index][1];
@@ -1385,18 +1374,15 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	real volume =  surface * itim->box[2];
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		fprintf(fp, "%f ",n[i]/surface);
-		fprintf(fp,"%f %f %f ", J[3*i],J[3*i+1],J[3*i+2]);
 #ifdef VIRIAL_EXTENSION
 		fprintf(fp,"%f %f %f ", f[3*i]/surface,f[3*i+1]/surface,f[3*i+2]/surface);
 		fprintf(fp, "%f %f %f ",vir[3*i]/volume,vir[3*i+1]/volume,vir[3*i+2]/volume);
 #endif
         }
-	fprintf(fp,"%f %f %f ", Jtot[i],Jtot[1],Jtot[2]);
 	fprintf(fp, "\n");
 	fclose(fp);
 	free(n);
 	free(f);
-	free(J);
 	free(vir);
 }
 
@@ -3242,40 +3228,17 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
   	gmx_rmpbc_t  gpbc=NULL;
 	t_pbc  pbc;
 
-	radii = load_radii(top);
-//        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
-//          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
 #ifdef VIRIAL_EXTENSION
 	flags = TRX_NEED_X | TRX_READ_V |  TRX_READ_F ;
 #else
-	flags = TRX_NEED_X | TRX_NEED_V ;
+	flags = TRX_NEED_X ;
 #endif
 
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
           gmx_fatal(FARGS,"Error loading the trajectory\n");
 
-	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
-        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add, bMol,top,bInfo); 
-
-	if(bDumpPhases){
-        	phase_cid=fopen("phase.gro","w");
-        	phase2_cid=fopen("phase2.gro","w");
-	}
-
 
                /* TODO: decide if the density of test lines (0.04) should be hardcoded or not.*/
-	FILE * statfile = fopen("stats.dat","w");
-	for(int i = 0 ; i < itim->maxlayers ; i++ ){
-		fprintf(statfile, "# surface_density ");
-#ifdef VIRIAL_EXTENSION
-		fprintf(statfile,"f_x f_y f_z ");
-		fprintf(statfile, "pres_x pres_y pres_z ");
-#endif
-	}
-	fprintf(statfile, "# \n");
-
-	fclose(statfile);
-	if(bInclusive) check_inclusive_conditions(index, gnx);
   	gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
@@ -3287,10 +3250,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 #endif //UNIX
 		x0 = fr.x;	
         	natoms = fr.natoms;
-#if 0
-		printf("frame\n");
-		for(int i=0;i<natoms;i++) printf("%f %f %f - %f %f %f\n",fr.x[i][0],fr.x[i][1],fr.x[i][2],fr.vir[i][0],fr.vir[i][1],fr.vir[i][2]);
-#endif
+
 		for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
     		gmx_rmpbc(gpbc,natoms,box,x0);
         	set_pbc(&pbc, ePBC, box);
@@ -3311,46 +3271,11 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
       			center_coords(&top->atoms,box,x0,axis,index[1],gnx[1]);
                 }
                 /* Identify the atom,tops belonging to the intrinsic surface */
-	        int success = compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
-		if(itim->info) printf("time=%.3f\n",fr.time);
-		if (!success && getenv("NO_IDENTIFICATION_ERROR")==NULL) exit(0);
-		if (success) { 
-		    if(bDumpPhases) { 
-	                itim->dump_phase_points(INNER_PHASE,top,phase_cid);  // gh
-	                itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); // gh
-                    }
-		    if(bDump){
-	   	        dump_slabs(top,0); 
-			//if(bMol)
-		    	 //  dump_slabs(top,1);
-		    }
-		    /* Compute the intrinsic profile */
-	            if(dens_opt!='s') {  
-		       //compute_layer_profile(box, index, top, dens_opt, & fr ); 
-		       collect_statistics_for_layers(itim,&fr);
- 		       compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
-                    }
-		} else {printf("Skipping frame %f\n",fr.time);}
-
+		for(int i=0;i<natoms;i++) { 
+			printf("%d   %f %f %f   %f %f %f\n",i,x0[i][0],x0[i][1],x0[i][2],fr.vir[i][0],fr.vir[i][1],fr.vir[i][2]);
+		}
   	} while (read_next_frame(oenv,status,&fr) &&  (global_interrupt == 0) );
         gmx_rmpbc_done(gpbc);
-
-        if(surf_cid  !=NULL)fclose(surf_cid);
-        if(surfmol_cid!=NULL)fclose(surfmol_cid);
-        if(phase_cid  !=NULL)fclose(phase_cid);
-        if(phase2_cid !=NULL)fclose(phase2_cid);
-
-	if(dens_opt!='s')   
-	   finalize_intrinsic_profile(slDensity, nslices, slWidth);
-#ifdef INTEGER_HISTO
-        for(int j=INNER_PHASE;j<itim->nphases;j++){
-             char fname[4096];
-             sprintf(fname,"intHist.%d.dat",j);
-             FILE * cid=fopen(fname,"w");
-             dump_int_histo(j,cid);
-        }
-#endif
-	free_profile(slDensity);	
 }
 
 void free_profile(real *** density){
