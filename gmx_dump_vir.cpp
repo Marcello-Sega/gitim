@@ -3288,6 +3288,8 @@ void free_profile(real *** density){
 
 int main(int argc,char *argv[])
 {
+
+#ifdef VIRIAL_EXTENSION
   const char *desc[] = {
     "Compute partial densities across the box, using an index file. Densities",
     "in kg/m^3, number densities or electron densities can be",
@@ -3523,4 +3525,5 @@ geometry[0]=geometry[1];
   plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm),dens_opt[0][0]);
 
   return 0;
+#endif
 }
