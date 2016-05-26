@@ -204,6 +204,7 @@ typedef struct {
 	int *backindex; // for the molecular version of the support group.
 	int com_opt[64];
         int bCom;
+        int bVirial;
         int bMol;
         int bInclusive;
         int bMCnormalization;
@@ -1138,10 +1139,41 @@ real * global_real_pointer;
 real * global_masses=NULL;
 real * global_charges=NULL;
 
+typedef struct {
+   int bCom ; 
+   int bMol ;
+   int bVirial ;
+   int bMCnormalization ; 
+   char com_opt_file[1024];
+   gmx_bool bCenter ;
+   gmx_bool bInfo ;
+   gmx_bool bIntrinsic ;
+   gmx_bool bInclusive ;
+   gmx_bool bCluster ;
+   gmx_bool bDump ;
+   gmx_bool bDumpPhases ;
+   gmx_bool bOrder ;
+   gmx_bool bHelp ;
+   gmx_bool bSymmetrize;
+ 
+} Flags ; 
+
+void InitFlags(Flags *f){
+  f->bCom=f->bMol=f->bVirial=FALSE;
+  f->bMCnormalization=0; 
+  f->bCenter=f->bInfo=f->bInclusive=f->bCluster=FALSE;
+  f->bDump=f->bDumpPhases=f->bOrder=f->bHelp=f->bSymmetrize=FALSE;
+  f->bIntrinsic=TRUE;
+}
+
+
+
+
+
 #ifdef INTEGER_HISTO
 unsigned long long int * int_histo;
 #endif
-ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins, int maxlayers,real * radii, int ** index, int *gnx,int *com_opt, int bOrder, int bInclusive, int dump_mol, int bMCnormalization, const char ** geometry, int ngrps_add, int bMol, t_topology * top,int bInfo);
+ITIM * init_intrinsic_surface(Flags myflags, int normal, real alpha, real mesh,  matrix box, int ngrps,int *nbins, int maxlayers,real * radii, int ** index, int *gnx,int *com_opt, int dump_mol, const char ** geometry, int ngrps_add, t_topology * top);
 
 
 void  compute_intrinsic_profile(matrix box, atom_id **index, t_topology * top, char dens_opt, t_trxframe * fr);
@@ -2471,21 +2503,22 @@ void check_inclusive_conditions(atom_id ** index, int *gnx){
 
 
 
-ITIM * init_intrinsic_surface(int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int bOrder, int bInclusive, int dump_mol, int bMCnormalization , const char ** geometry, int ngrps_add, int bMol, t_topology * top, int bInfo){
+ITIM * init_intrinsic_surface(Flags myflags, int normal, real alpha, real mesh,  matrix box, int ngrps, int *nbins, int maxlayers, real * radii, int** gmx_index,int *gnx, int *com_opt,int dump_mol, const char ** geometry, int ngrps_add, t_topology * top){
 	    ITIM * itim;
 	    int i;
             int histofactor=1;
             /* ngrps + 1 here  because of the random phase used to to a MC estimate of the bin volumes for the density profile*/
      	    init_itim(ngrps+1,ngrps_add) ;
 	    itim = global_itim;
-	    itim->info = bInfo; // TODO put me into cmdline...
+	    itim->info = myflags.bInfo; // TODO put me into cmdline...
 	    itim->nadd_index =  ngrps_add;
 	    itim->maxlayers = maxlayers;
      	    itim->method = METHOD_ITIM;
-            itim->bMol=bMol;
-            itim->bOrder=bOrder;
-            itim->bInclusive=bInclusive;
-            itim->bMCnormalization=bMCnormalization;
+            itim->bMol=myflags.bMol;
+            itim->bOrder=myflags.bOrder;
+            itim->bVirial=myflags.bVirial;
+            itim->bInclusive=myflags.bInclusive;
+            itim->bMCnormalization=myflags.bMCnormalization;
             itim->n_histo=GET_HISTO_SIZE();
             itim->dump_mol=dump_mol;
             /* 1 mass dens x phases  (+random phase),  ( 1 number dens , 4 order, 4 error on order) x phases */
@@ -2846,9 +2879,36 @@ This is too cluttered. Reorganize the code...
 			    	case 'n': value = 1; break;
 #ifdef VIRIAL_EXTENSION
 			    	case 't': 
+					tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
+
+					if(itim->bVirial==true){
 						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
 						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (0.5 * (tmprvec[0]+tmprvec[1])) / tmpreal;  // TODO: other directions than z ...
+						value = (0.5 * (tmprvec[0]+tmprvec[1]));  
+					} else { 
+                                                real mass = itim->masses[gmx_index_phase[j][i]] ;
+
+						/* 
+						   == For testing purposes ==
+						note: 1 kJ/mol = 16.6054 bar nm^3 
+
+						The following should give the total kinetic energy in kJ/mol :
+					  	   copy_rvec(fr->v[gmx_index_phase[j][i]],tmprvec);
+						   value =  0.5 * mass * (SQR(tmprvec[2]) + SQR(tmprvec[1])+SQR(tmprvec[0])) ;
+
+                                                The following should give the total vir_xx in bar nm^3 (mind the sign & factor)
+						   copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
+                                                   value = -tmprvec[0]/2.  ; 
+						*/
+
+						/* we write out the average (Pxx+Pyy)/2. */
+						// ideal gas 
+						copy_rvec(fr->v[gmx_index_phase[j][i]],tmprvec);
+						value =  mass * 0.5 * (SQR(tmprvec[0])+ SQR(tmprvec[1])) * 16.6054 ; 
+						// virial (the factor -2 is already in)
+						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
+                                                value += 0.5 * (tmprvec[0] + tmprvec[1])  ; 
+					}
 						break ; 
 			    	case 'E': 
 						tmpreal = fr->pener[gmx_index_phase[j][i]];
@@ -2859,11 +2919,6 @@ This is too cluttered. Reorganize the code...
 						for(int ii=0;ii<itim->n[j];ii++)
                                                        tmpreal+=fr->pener[gmx_index_phase[j][ii]];
 						value = tmpreal / (itim->box[0]*itim->box[1]*itim->box[2]);
-						break ; 
-			    	case 'p': 
-						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
-						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (tmprvec[2]) / tmpreal;  // TODO: other directions than z ...
 						break ; 
 #endif
 			    	default : value =1 ; break;
@@ -3192,7 +3247,6 @@ real * load_radii( t_topology *top ) {
             	vdw  = pow(sig6,1.0/6.0);
         	}
             radii[i] = 0.5 * vdw;
-		printf("%d %f\n",i,radii[i]);
        }
        return radii;
 }
@@ -3219,11 +3273,11 @@ void sig_handler(int signo)
 #endif //UNIX
 
 
-void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
+void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int gnx[],
 		  real ***slDensity, int *nslices, int maxlayers, t_topology *top, int ePBC,
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
-                  real alpha,int *com_opt, int bOrder, int bInclusive, const char ** geometry, 
-                  int bDump,int bDumpPhases,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt,int ngrps_add, int bMol,int bInfo){
+                  real alpha,int *com_opt, const char ** geometry, 
+                  int dump_mol,char dens_opt,int ngrps_add){
 	enum {NO_ADDITIONAL_INFO=0,ADDITIONAL_INFO=1};
 	ITIM * itim;
 	real * radii;
@@ -3255,9 +3309,9 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
           gmx_fatal(FARGS,"Error loading the trajectory\n");
 
 	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
-        itim = init_intrinsic_surface(axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,bOrder,bInclusive,dump_mol,bMCnormalization,geometry,ngrps_add, bMol,top,bInfo); 
+        itim = init_intrinsic_surface(myflags,axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,dump_mol,geometry,ngrps_add, top); 
 
-	if(bDumpPhases){
+	if(myflags.bDumpPhases){
         	phase_cid=fopen("phase.gro","w");
         	phase2_cid=fopen("phase2.gro","w");
 	}
@@ -3275,7 +3329,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 	fprintf(statfile, "# \n");
 
 	fclose(statfile);
-	if(bInclusive) check_inclusive_conditions(index, gnx);
+	if(myflags.bInclusive) check_inclusive_conditions(index, gnx);
   	gpbc = wrap_gmx_rmpbc_init(&top->idef,ePBC,top->atoms.nr,box);
 	do { 
 // (SAW) BUG : when no pbc are defined, it loops forever... 
@@ -3294,10 +3348,10 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
     		gmx_rmpbc(gpbc,natoms,box,x0);
         	set_pbc(&pbc, ePBC, box);
-                if(bCenter){
+                if(myflags.bCenter){
 		    put_atoms_in_box(ePBC,box,natoms,x0);
 	            /* Make our reference phase whole */
-                    if(!bInclusive) { 
+                    if(!myflags.bInclusive) { 
 		       remove_phase_pbc(ePBC,&top->atoms,box, x0, axis, index[0], gnx[0]);
 		    } else { 
 		       remove_phase_pbc(ePBC,&top->atoms,box, x0, axis, index[1], gnx[1]);
@@ -3305,21 +3359,21 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
                 }
 		/* Now center the com of the reference phase in the middle of the box (the one from -box/2 to box/2, 
                    not the gromacs std one:), and shift/rebox the rest accordingly */
-                if(!bInclusive) { 
+                if(!myflags.bInclusive) { 
       			center_coords(&top->atoms,box,x0,axis,index[0],gnx[0]);
 		} else { 
       			center_coords(&top->atoms,box,x0,axis,index[1],gnx[1]);
                 }
                 /* Identify the atom,tops belonging to the intrinsic surface */
-	        int success = compute_intrinsic_surface(bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
+	        int success = compute_intrinsic_surface(myflags.bCluster, box, nr_grps, x0, gnx, index,top,natoms,pbc);
 		if(itim->info) printf("time=%.3f\n",fr.time);
 		if (!success && getenv("NO_IDENTIFICATION_ERROR")==NULL) exit(0);
 		if (success) { 
-		    if(bDumpPhases) { 
+		    if(myflags.bDumpPhases) { 
 	                itim->dump_phase_points(INNER_PHASE,top,phase_cid);  // gh
 	                itim->dump_phase_points(OUTER_PHASE,top,phase2_cid); // gh
                     }
-		    if(bDump){
+		    if(myflags.bDump){
 	   	        dump_slabs(top,0); 
 			//if(bMol)
 		    	 //  dump_slabs(top,1);
@@ -3389,28 +3443,18 @@ int main(int argc,char *argv[])
   static int  ngrps   = 1;       /* nr. of groups              */
   static int  ngrps_add  = 0;       /* nr. of groups              */
   static int  maxlayers = 1;       /* max nr. of layers to analyze */
-  static gmx_bool bSymmetrize=FALSE;
   int com_opt[64];
   int dump_mol=0;
-  int bCom=FALSE; 
-  int bMol=FALSE;
-  int bMCnormalization=0; 
-  char com_opt_file[1024];
-  static gmx_bool bCenter=FALSE;
-  static gmx_bool bInfo=FALSE;
-  static gmx_bool bIntrinsic=TRUE;
-  static gmx_bool bInclusive=FALSE;
-  static gmx_bool bCluster=FALSE;
-  static gmx_bool bDump=FALSE;
-  static gmx_bool bDumpPhases=FALSE;
-  static gmx_bool bOrder=FALSE;
-  static gmx_bool bHelp=FALSE;
+
+  Flags myflags;
+  InitFlags(&myflags);
+
   t_pargs pa[] = {
     { "-d", FALSE, etSTR, {&axtitle}, 
       "Take the normal on the membrane in direction X, Y or Z." },
-    { "-dump", FALSE, etBOOL, {&bDump}, 
+    { "-dump", FALSE, etBOOL, {&(myflags.bDump)}, 
       "Dump interfacial atoms." },
-    { "-dumpphase", FALSE, etBOOL, {&bDumpPhases}, 
+    { "-dumpphase", FALSE, etBOOL, {&(myflags.bDumpPhases)}, 
       "Dump phase atoms." },
     { "-sl",  FALSE, etINT, {&nslices},
       "Divide the box in #nr slices." },
@@ -3418,32 +3462,36 @@ int main(int argc,char *argv[])
       "Density"},
     { "-ng",       FALSE, etINT, {&ngrps},
       "Number of groups to compute densities of" },
+#ifdef VIRIAL_EXTENSION
+    { "-virial",       FALSE, etBOOL, {&(myflags.bVirial)},
+      "use virial instead of pressure" },
+#endif 
     { "-additional",       FALSE, etINT, {&ngrps_add},
       "Additional groups of which the intrinsic profile per layer should be computed (must belong to the 1st group)" },
-    { "-symm",    FALSE, etBOOL, {&bSymmetrize},
+    { "-symm",    FALSE, etBOOL, {&(myflags.bSymmetrize)},
       "Symmetrize the density along the axis, with respect to the center. Useful for bilayers." },
-    { "-center",  FALSE, etBOOL, {&bCenter},
+    { "-center",  FALSE, etBOOL, {&(myflags.bCenter)},
       "Shift the center of mass along the axis to zero. This means if your axis is Z and your box is bX, bY, bZ, the center of mass will be at bX/2, bY/2, 0."},
-    { "-info",  FALSE, etBOOL, {&bInfo},
+    { "-info",  FALSE, etBOOL, {&(myflags.bInfo)},
       "Print additional information during the analysis, such as the number of surface atoms found in each frame."},
-    { "-intrinsic",  TRUE, etBOOL, {&bIntrinsic},
+    { "-intrinsic",  TRUE, etBOOL, {&(myflags.bIntrinsic)},
       "For back-compatibility only. Does nothing"},
-    { "-inclusive",  FALSE, etBOOL, {&bInclusive},
+    { "-inclusive",  FALSE, etBOOL, {&(myflags.bInclusive)},
       "Include in the surface calculation molecules from an opposite phase which are not in the main cluster"},
-    { "-cluster", FALSE, etBOOL, {&bCluster}, 
+    { "-cluster", FALSE, etBOOL, {&(myflags.bCluster)}, 
       "Filter initial molecules through cluster analysis" },
     { "-alpha", FALSE, etREAL, {&alpha}, 
       "Probe sphere radius for the intrinsic analysis" },
     { "-layers", FALSE, etINT, {&maxlayers}, 
       "number of layers to analyze" },
-    { "-MCnorm", FALSE, etBOOL, {&bMCnormalization}, 
+    { "-MCnorm", FALSE, etBOOL, {&(myflags.bMCnormalization)}, 
       "automatic normalization using MC calculation for arbitrary coordinate systems" },
-    { "-mol", FALSE, etBOOL, {&bMol}, 
+    { "-mol", FALSE, etBOOL, {&(myflags.bMol)}, 
       "Does molecule-based intrinsic analysis" },
-    { "-com", FALSE, etBOOL, {&bCom}, 
+    { "-com", FALSE, etBOOL, {&(myflags.bCom)}, 
       "with the -intrinsic option, perform a molecule-based intrinsic analysis. One should give to this flag the number of atoms in the molecule for each group, space-separated. A zero should be used when no center of mass calculation should be used." },
 #if GMX_VERSION >= 50000
-    { "-h", FALSE, etBOOL, {&bHelp},  "Print a help message" },
+    { "-h", FALSE, etBOOL, {&(myflags.bHelp)},  "Print a help message" },
 #endif
 
   };
@@ -3497,10 +3545,9 @@ geometry[0]=geometry[1];
   parse_common_args(&argc,argv,PCA_CAN_VIEW | PCA_CAN_TIME, NFILE,fnm,asize(pa),pa,asize(desc),desc,0,NULL,&oenv) ;
 
 
-
-  if (bSymmetrize && !bCenter) {
+  if (myflags.bSymmetrize && !myflags.bCenter) {
     fprintf(stdout,"Can not symmetrize without centering. Turning on -center\n");
-    bCenter = TRUE;
+    myflags.bCenter = TRUE;
   }
   /* Calculate axis */
   axis = toupper(axtitle[0]) - 'X';
@@ -3510,7 +3557,6 @@ geometry[0]=geometry[1];
 #else 
   top = read_top(ftp2fn(efTPR,NFILE,fnm),&ePBC);     /* read topology file */
 #endif
-
 
   global_masses = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
   global_charges = (real * ) malloc( (top->atoms.nr)*sizeof(real )) ;
@@ -3536,7 +3582,7 @@ geometry[0]=geometry[1];
   get_index(&top->atoms,ftp2fn_null(efNDX,NFILE,fnm),ngrps+ngrps_add,ngx,index,grpname); 
   for(i=0;i<64;i++) com_opt[i]=0;
   if (ngrps>=64) exit(printf("Error, too many groups\n"));
-  if(bCom) { 
+  if(myflags.bCom) { 
      FILE* comfile;
      char comstr[1024],*pchar;
      int iter=0;
@@ -3547,7 +3593,7 @@ geometry[0]=geometry[1];
      }
   } 
   float tmpcut;
-  if(bCluster) {
+  if(myflags.bCluster) {
     for (i=0;i<ngrps;i++) { //gh
       printf("\n Enter a cluster cut-off value for group %s",grpname[i]);
       scanf("%f",&tmpcut);
@@ -3590,10 +3636,11 @@ geometry[0]=geometry[1];
   }
 
   
-  calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),index,ngx,&density,&nslices,maxlayers,
-                           top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,bOrder,bInclusive,
-                           geometry,bDump,bDumpPhases,bCenter,bCluster, dump_mol,bMCnormalization,
-                           dens_opt[0][0],ngrps_add,bMol,bInfo);
+  calc_intrinsic_density(ftp2fn(efTRX,NFILE,fnm),myflags,
+                           index,ngx,&density,&nslices,maxlayers,
+                           top,ePBC,axis,ngrps,&slWidth,oenv,alpha,com_opt,
+                           geometry,dump_mol,
+                           dens_opt[0][0],ngrps_add);
 
   plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm),dens_opt[0][0]);
 
