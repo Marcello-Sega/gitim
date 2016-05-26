@@ -3209,6 +3209,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		  int axis, int nr_grps, real *slWidth, const output_env_t oenv,
                   real alpha,int *com_opt, int bOrder, int bInclusive, const char ** geometry, 
                   int bDump,int bDumpPhases,int bCenter,int bCluster, int dump_mol,int bMCnormalization,char dens_opt,int ngrps_add, int bMol,int bInfo){
+#ifdef VIRIAL_EXTENSION
 	enum {NO_ADDITIONAL_INFO=0,ADDITIONAL_INFO=1};
 	ITIM * itim;
 	real * radii;
@@ -3275,6 +3276,7 @@ void calc_intrinsic_density(const char *fn, atom_id **index, int gnx[],
 		}
   	} while (read_next_frame(oenv,status,&fr) &&  (global_interrupt == 0) );
         gmx_rmpbc_done(gpbc);
+#endif 
 }
 
 void free_profile(real *** density){
@@ -3287,6 +3289,8 @@ void free_profile(real *** density){
 
 int main(int argc,char *argv[])
 {
+
+#ifdef VIRIAL_EXTENSION
   const char *desc[] = {
     "Compute partial densities across the box, using an index file. Densities",
     "in kg/m^3, number densities or electron densities can be",
@@ -3525,4 +3529,5 @@ geometry[0]=geometry[1];
   plot_intrinsic_density(global_itim->histograms, grpname, opt2fn("-o",NFILE,fnm),dens_opt[0][0]);
 
   return 0;
+#endif
 }
