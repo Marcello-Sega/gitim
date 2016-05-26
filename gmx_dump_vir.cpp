@@ -3071,7 +3071,6 @@ void remove_phase_pbc(int ePBC, t_atoms *atoms, matrix box, rvec x0[], int axis,
          if(rho[0] > rho_max/2 || rho[4] > rho_max/2) { /* careful: not >= otherwise the algorithm doesn't work when rho=0 
             					       in all sampled regions */
             	shift+=bWidth*rand()/RAND_MAX;
-		if(itim->info) fprintf(stdout,"Trying to shift the box by %f nm\n",shift);
 		if(shift>box[axis][axis]) exit(printf("Error: it was not possible to center the phase in the box\n"));
          } else return ;
     }
@@ -3303,6 +3302,9 @@ int main(int argc,char *argv[])
     "partial charge."
   };
 
+#ifndef VIRIAL_EXTENSION
+	exit(printf("This tool supports only the virial extension of gromacs trajectories\n"));
+#endif
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
