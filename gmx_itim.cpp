@@ -2792,6 +2792,13 @@ This is too cluttered. Reorganize the code...
 			    	case 'm': value = itim->masses[gmx_index_phase[j][i]]; break;
 			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
 			    	case 'n': value = 1; break;
+			    	case 'x': value = SQR(fr->v[gmx_index_phase[j][i]][0]); break;
+			    	case 'y': value = SQR(fr->v[gmx_index_phase[j][i]][1]); break;
+			    	case 'z': value = SQR(fr->v[gmx_index_phase[j][i]][2]); break;
+			    	case 'X': value = fr->v[gmx_index_phase[j][i]][0]; break;
+			    	case 'Y': value = fr->v[gmx_index_phase[j][i]][1]; break;
+			    	case 'Z': value = fr->v[gmx_index_phase[j][i]][2]; break;
+			
 #ifdef VIRIAL_EXTENSION
 			    	case 't': 
 					tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
@@ -3217,7 +3224,7 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
 #ifdef VIRIAL_EXTENSION
 	flags = TRX_NEED_X | TRX_READ_V |  TRX_READ_F ;
 #else
-	flags = TRX_NEED_X ;
+	flags = TRX_NEED_X | TRX_READ_V;
 #endif
 
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
