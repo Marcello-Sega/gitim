@@ -1373,27 +1373,40 @@ void arrange_bulk_points (int Bulk_nelem, real * Bulk_points, GEOMETRY geometry,
 
 void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	int i,layer,atom_index,phase_index;
-	real * f,*vir,*p;
+	real * f,*vir,*p,*J;
+	real Jtot[3];
 	int *n;
 	FILE*fp;
 	n   = (int*)malloc(itim->maxlayers * sizeof(int));
 	p   = (real*)malloc(itim->maxlayers * sizeof(real));
 	f   = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
 	vir = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
+	J   = (real*)malloc((itim->maxlayers+1) * 3 * sizeof(real));
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		n[i]=0;
 		p[i]=0;
 		f[3*i]=f[3*i+1]=f[3*i+2]=0.0;
 		vir[3*i]=vir[3*i+1]=vir[3*i+2]=0.0;
+		J[3*i]=J[3*i+1]=J[3*i+2]=0.0;
+		J[3*(i+1)]=J[3*(i+1)+1]=J[3*(i+1)+2]=0.0;
 	}
+	Jtot[0]=Jtot[1]=Jtot[2]=0.0;
  	for(i=0;i<itim->n[SUPPORT_PHASE];i++){
 	       atom_index = itim->gmx_index[SUPPORT_PHASE][i];
                double m = itim->masses[atom_index];
+#ifdef VIRIAL_EXTENSION
+	       Jtot[0] += fr->v[atom_index][0] * itim->charges[atom_index];
+	       Jtot[1] += fr->v[atom_index][1] * itim->charges[atom_index];
+	       Jtot[2] += fr->v[atom_index][2] * itim->charges[atom_index];
+#endif
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
                  p[layer]+=fr->x[atom_index][itim->normal]*itim->charges[atom_index];
 #ifdef VIRIAL_EXTENSION
+	         J[3*layer+0] += fr->v[atom_index][0] * itim->charges[atom_index];
+	         J[3*layer+1] += fr->v[atom_index][1] * itim->charges[atom_index];
+	         J[3*layer+2] += fr->v[atom_index][2] * itim->charges[atom_index];
                  f[3*layer]   += fr->f[atom_index][0];
                  f[3*layer+1] += fr->f[atom_index][1];
                  f[3*layer+2] += fr->f[atom_index][2];
@@ -1410,16 +1423,19 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		fprintf(fp, "%f ",n[i]/surface);
 		fprintf(fp, "%f ",p[i]/n[i]);
+		fprintf(fp,"%f %f %f ", J[3*i],J[3*i+1],J[3*i+2]);
 #ifdef VIRIAL_EXTENSION
 		fprintf(fp,"%f %f %f ", f[3*i]/surface,f[3*i+1]/surface,f[3*i+2]/surface);
 		fprintf(fp, "%f %f %f ",vir[3*i]/volume,vir[3*i+1]/volume,vir[3*i+2]/volume);
 #endif
         }
+	fprintf(fp,"%f %f %f ", Jtot[i],Jtot[1],Jtot[2]);
 	fprintf(fp, "\n");
 	fclose(fp);
 	free(n);
 	free(p);
 	free(f);
+	free(J);
 	free(vir);
 }
 
@@ -3232,13 +3248,20 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
 //        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
 //          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
 #ifdef VIRIAL_EXTENSION
-	flags = TRX_NEED_X | TRX_READ_V |  TRX_READ_F ;
+	flags = TRX_NEED_X ;
+	if(dens_opt=='t') flags |= TRX_READ_V |  TRX_READ_F ;
 #else
 	flags = TRX_NEED_X | TRX_READ_V;
 #endif
 
-	if (!read_first_frame(oenv, &status,  fn , &fr, flags))
+	if (!read_first_frame(oenv, &status,  fn , &fr, flags)){
+
+	if(dens_opt=='t') { 
+          gmx_fatal(FARGS,"Error loading the trajectory: need position, velocities and forces\n");
+        } else { 
           gmx_fatal(FARGS,"Error loading the trajectory\n");
+	}
+}
 
 	for(int i=0;i<3;i++) for(int j=0;j<3;j++) box[i][j] = fr.box[i][j];
         itim = init_intrinsic_surface(myflags,axis, alpha, 0.04,  box, nr_grps, nslices,maxlayers,radii,index,gnx,com_opt,dump_mol,geometry,ngrps_add, top); 
@@ -3367,7 +3390,7 @@ int main(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy", "U(total energy)", "xvel2", "yvel2", "zvel2","Xvel","Yvel","Zvel",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 

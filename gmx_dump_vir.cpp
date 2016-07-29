@@ -2822,6 +2822,7 @@ This is too cluttered. Reorganize the code...
                      i+=itim->com_opt[j]-1;
                      p4[0]/=locmass; p4[1]/=locmass; p4[2]/=locmass;
                 } else { 
+	 		real masss;
                      if(itim->bOrder) { order[0]=order[1]=order[2]=order[3]=0.0; 
                      		        order2[0]=order2[1]=order2[2]=order2[3]=0.0; } 
                      if(j<itim->ngmxphases){ /* to take in account the random phase */
@@ -2832,9 +2833,14 @@ This is too cluttered. Reorganize the code...
 			    	case 'n': value = 1; break;
 #ifdef VIRIAL_EXTENSION
 			    	case 't': 
+						masss = global_masses[gmx_index_phase[j][i]];
+
+						copy_rvec(fr->v[gmx_index_phase[j][i]],tmprvec);
+						value =  masss * 0.5 * (SQR(tmprvec[0])+ SQR(tmprvec[1])) * 16.6054 ; 
+						// virial (the factor -2 is already in)
 						copy_rvec(fr->vir[gmx_index_phase[j][i]],tmprvec);
-						tmpreal = itim->box[0]*itim->box[1]*itim->box[2];
-						value = (0.5 * (tmprvec[0]+tmprvec[1])) / tmpreal;  // TODO: other directions than z ...
+                                                value += 0.5 * (tmprvec[0] + tmprvec[1])  ; 
+
 						break ; 
 			    	case 'E': 
 						tmpreal = fr->pener[gmx_index_phase[j][i]];
