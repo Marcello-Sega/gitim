@@ -2866,11 +2866,6 @@ This is too cluttered. Reorganize the code...
 #endif
 			    	default : value =1 ; break;
                             }
-/// SAW
-		            if(j==SUPPORT_PHASE){
-				printf("dump %c %d %g\n",dens_opt,molecular_layer,value);
-			    }
-/// SAW
                             locmass=value;
 		            p4[0]=itim->phase[j][3*i]; p4[1]=itim->phase[j][3*i+1]; p4[2]=itim->phase[j][3*i+2];
                      } else { 
@@ -3248,8 +3243,7 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
 //        if ((natoms = read_first_x(oenv,&status,fn,&t,&x0,box)) == 0)
 //          gmx_fatal(FARGS,"Could not read coordinates from statusfile\n");
 #ifdef VIRIAL_EXTENSION
-	flags = TRX_NEED_X ;
-	if(dens_opt=='t') flags |= TRX_READ_V |  TRX_READ_F ;
+	flags = TRX_NEED_X  |  TRX_READ_V |  TRX_READ_F;
 #else
 	flags = TRX_NEED_X | TRX_READ_V;
 #endif
@@ -3359,7 +3353,7 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
              dump_int_histo(j,cid);
         }
 #endif
-	free_profile(slDensity);	
+	if(dens_opt!='s')free_profile(slDensity);	
 }
 
 void free_profile(real *** density){
