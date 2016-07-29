@@ -1373,14 +1373,16 @@ void arrange_bulk_points (int Bulk_nelem, real * Bulk_points, GEOMETRY geometry,
 
 void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	int i,layer,atom_index,phase_index;
-	real * f,*vir;
+	real * f,*vir,*p;
 	int *n;
 	FILE*fp;
 	n   = (int*)malloc(itim->maxlayers * sizeof(int));
+	p   = (real*)malloc(itim->maxlayers * sizeof(real));
 	f   = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
 	vir = (real*)malloc(itim->maxlayers * 3 * sizeof(real));
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		n[i]=0;
+		p[i]=0;
 		f[3*i]=f[3*i+1]=f[3*i+2]=0.0;
 		vir[3*i]=vir[3*i+1]=vir[3*i+2]=0.0;
 	}
@@ -1390,6 +1392,7 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
 		 n[layer]+=1;
+                 p[layer]+=fr->x[atom_index][itim->normal]*itim->charges[atom_index];
 #ifdef VIRIAL_EXTENSION
                  f[3*layer]   += fr->f[atom_index][0];
                  f[3*layer+1] += fr->f[atom_index][1];
@@ -1406,6 +1409,7 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	real volume =  surface * itim->box[2];
 	for(i = 0 ; i < itim->maxlayers ; i++ ){
 		fprintf(fp, "%f ",n[i]/surface);
+		fprintf(fp, "%f ",p[i]/n[i]);
 #ifdef VIRIAL_EXTENSION
 		fprintf(fp,"%f %f %f ", f[3*i]/surface,f[3*i+1]/surface,f[3*i+2]/surface);
 		fprintf(fp, "%f %f %f ",vir[3*i]/volume,vir[3*i+1]/volume,vir[3*i+2]/volume);
@@ -1414,6 +1418,7 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 	fprintf(fp, "\n");
 	fclose(fp);
 	free(n);
+	free(p);
 	free(f);
 	free(vir);
 }
@@ -2845,6 +2850,11 @@ This is too cluttered. Reorganize the code...
 #endif
 			    	default : value =1 ; break;
                             }
+/// SAW
+		            if(j==SUPPORT_PHASE){
+				printf("dump %c %d %g\n",dens_opt,molecular_layer,value);
+			    }
+/// SAW
                             locmass=value;
 		            p4[0]=itim->phase[j][3*i]; p4[1]=itim->phase[j][3*i+1]; p4[2]=itim->phase[j][3*i+2];
                      } else { 
@@ -3357,7 +3367,7 @@ int main(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy", "U(total energy)",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "pressure", "Energy", "U(total energy)", "xvel2", "yvel2", "zvel2","Xvel","Yvel","Zvel",  NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
