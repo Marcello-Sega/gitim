@@ -1401,8 +1401,10 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 #endif
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
+                 if(layer==0)printf("%f %f\n",itim->phase[SUPPORT_PHASE][3*i+itim->normal],itim->charges[atom_index]);
 		 n[layer]+=1;
-                 p[layer]+=fr->x[atom_index][itim->normal]*itim->charges[atom_index];
+		 real sign=(itim->phase[SUPPORT_PHASE][3*i+itim->normal]>0?1:-1);
+                 p[layer]+=sign*itim->phase[SUPPORT_PHASE][3*i+itim->normal]*itim->charges[atom_index];
 #ifdef VIRIAL_EXTENSION
 	         J[3*layer+0] += fr->v[atom_index][0] * itim->charges[atom_index];
 	         J[3*layer+1] += fr->v[atom_index][1] * itim->charges[atom_index];
@@ -1425,11 +1427,10 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 		fprintf(fp, "%f ",p[i]/n[i]);
 		fprintf(fp,"%f %f %f ", J[3*i],J[3*i+1],J[3*i+2]);
 #ifdef VIRIAL_EXTENSION
-		fprintf(fp,"%f %f %f ", f[3*i]/surface,f[3*i+1]/surface,f[3*i+2]/surface);
 		fprintf(fp, "%f %f %f ",vir[3*i]/volume,vir[3*i+1]/volume,vir[3*i+2]/volume);
 #endif
         }
-	fprintf(fp,"%f %f %f ", Jtot[i],Jtot[1],Jtot[2]);
+	fprintf(fp,"%f %f %f ", Jtot[0],Jtot[1],Jtot[2]);
 	fprintf(fp, "\n");
 	fclose(fp);
 	free(n);
@@ -3268,11 +3269,11 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
 
                /* TODO: decide if the density of test lines (0.04) should be hardcoded or not.*/
 	FILE * statfile = fopen("stats.dat","w");
+	fprintf(statfile, "#column ");
 	for(int i = 0 ; i < itim->maxlayers ; i++ ){
-		fprintf(statfile, "# surface_density ");
+		fprintf(statfile, "layer %d surface_density",i);
 #ifdef VIRIAL_EXTENSION
-		fprintf(statfile,"f_x f_y f_z ");
-		fprintf(statfile, "pres_x pres_y pres_z ");
+		fprintf(statfile, " (layer %d) %d=surface_density %d=dipolez %d=jx jy jz %d=px py pz",i*8,i*8+1,i*8+2,i*8+3,i*8+6);
 #endif
 	}
 	fprintf(statfile, "# \n");
@@ -3328,9 +3329,9 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
 		    	 //  dump_slabs(top,1);
 		    }
 		    /* Compute the intrinsic profile */
+		       collect_statistics_for_layers(itim,&fr);
 	            if(dens_opt!='s') {  
 		       //compute_layer_profile(box, index, top, dens_opt, & fr ); 
-		       collect_statistics_for_layers(itim,&fr);
  		       compute_intrinsic_profile(box, index, top,dens_opt, & fr); 
                     }
 		} else {printf("Skipping frame %f\n",fr.time);}
