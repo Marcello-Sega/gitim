@@ -1401,7 +1401,6 @@ void collect_statistics_for_layers(ITIM * itim, t_trxframe * fr){
 #endif
 	       if(itim->mask[i]>0 && itim->mask[i]< itim->maxlayers+1){
 		 layer = itim->mask[i]-1;
-                 if(layer==0)printf("%f %f\n",itim->phase[SUPPORT_PHASE][3*i+itim->normal],itim->charges[atom_index]);
 		 n[layer]+=1;
 		 real sign=(itim->phase[SUPPORT_PHASE][3*i+itim->normal]>0?1:-1);
                  p[layer]+=sign*itim->phase[SUPPORT_PHASE][3*i+itim->normal]*itim->charges[atom_index];
