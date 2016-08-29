@@ -3045,6 +3045,7 @@ void remove_phase_pbc(int ePBC, t_atoms *atoms, matrix box, rvec x0[], int axis,
      /* compute the density at different control points: box edges, middle + some more */
      int rho[5],rho_max,i,nbins=25; 
      static real shift=0.0;
+     real initial_shift=shift;
      real bWidth ,z ;
      ITIM* itim = global_itim;
   // TODO: check: this does not work with a solid ... bin must bigger than average interparticle z distance...
@@ -3072,7 +3073,7 @@ void remove_phase_pbc(int ePBC, t_atoms *atoms, matrix box, rvec x0[], int axis,
             					       in all sampled regions */
             	shift+=bWidth*rand()/RAND_MAX;
 		if(itim->info) fprintf(stdout,"Trying to shift the box by %f nm\n",shift);
-		if(shift>box[axis][axis]) exit(printf("Error: it was not possible to center the phase in the box\n"));
+		if(shift-initial_shift >box[axis][axis]) exit(printf("Error: it was not possible to center the phase in the box\n"));
          } else return ;
     }
 }
