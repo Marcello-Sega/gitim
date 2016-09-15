@@ -14,7 +14,7 @@ REF1  M. Sega, S. S. Kantorovich, P. Jedlovszky and M. Jorge,
 
 For the ITIM algorithm, 
 
-REF2  L. B. Pártay, G. Hantal, P. Jedlovszky, A. Vincze, and 
+REF2  L. B. Pártay, G. Hantal, P. Jedlovszky, A. Vincze, and 
       G. Horvai,
       J. Comput. Chem. 29, 945 (2008).
 
@@ -39,7 +39,7 @@ launch cmake providing the location of your gromacs tree
 and your gromacs build, e.g. 
 
 
-   cmake .. -DMYGMX_SRC=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
+   cmake .. -DMYGMX_TREE=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
 
 compile
    
