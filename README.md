@@ -111,7 +111,7 @@ enter the repository and create a build directory
 There, launch cmake providing the location of your gromacs tree
 and your gromacs build (these two could coincide), for example:
 
-    cmake .. -DMYGMX_SRC=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
+    cmake .. -DMYGMX_TREE=~/gromacs-5.0.6/ -DMYGMX_BUILD=~/gromacs-5.0.6/build/
 
 compile with 
    
