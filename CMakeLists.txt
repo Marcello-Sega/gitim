@@ -97,6 +97,13 @@ MESSAGE(STATUS "============================================================")
 
 ### version 4.6.x
 
+IF(${GMX_VERSION} VERSION_GREATER 59000) 
+MESSAGE(STATUS "============================================================")
+MESSAGE(STATUS "GMX version: ${GMX_VERSION} not suppprted.")
+MESSAGE(STATUS "============================================================")
+MESSAGE(STATUS "                                                            ")
+MESSAGE(FATAL_ERROR "supported versions only up to 5.x")
+ENDIF(${GMX_VERSION} VERSION_GREATER 59000) 
 IF(${GMX_VERSION} VERSION_LESS 50000) 
 	# we need to check only for these two headers, the others will be in the same directories
 	SET (HEADERLIST "gmx_statistics.h" "gmx_header_config.h" "version.h")
