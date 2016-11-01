@@ -32,70 +32,108 @@
  * And Hey:
  * Green Red Orange Magenta Azure Cyan Skyblue
  */
-//// TODO: fix these includes 
-// #if GMX_VERSION>=50000
 
-#define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c))
-#define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(e),(f))
-#include "gmxpre.h"
-#include <gsl/gsl_multimin.h>
+/*
+NOTE: how to acess atom properties
+        if you have the index of the phase :
+           for(i=0;i<itim->n[phase];i++){
+                     atom_index = itim->gmx_index[phase][i];
+                     resindex   = top->atoms.atom[atom_index].resind;
+                     resname    = *top->atoms.resinfo[top->atoms.atom[atom_index].resind].name
+                     atomname   = *(top->atoms.atomname[atom_index]);
+                     pos_x      = itim->phase[phase][3*i];
+           }
+        if you have the index of the alpha-shape:
+	   for(i=0;i<itim->nalphapoints;i++){
+		    phase_index =itim->alpha_index[i];
+                    atom_index  =itim->gmx_index[SUPPORT_PHASE][phase_index];
+                    ...
+           }
 
-#include <ctype.h>
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
+*/  
 
-#include "gromacs/commandline/pargs.h"
-#include "gromacs/fileio/tpxio.h"
-#include "gromacs/fileio/trxio.h"
-#include "gromacs/fileio/xvgr.h"
-#include "gromacs/gmxana/gmx_ana.h"
-#include "gromacs/gmxana/gstat.h"
-#include "gromacs/legacyheaders/macros.h"
-#include "gromacs/legacyheaders/typedefs.h"
-#include "gromacs/legacyheaders/viewit.h"
-#include "gromacs/math/units.h"
-#include "gromacs/math/vec.h"
-#include "gromacs/pbcutil/pbc.h"
-#include "gromacs/pbcutil/rmpbc.h"
-#include "gromacs/topology/index.h"
-#include "gromacs/utility/cstringutil.h"
-#include "gromacs/utility/fatalerror.h"
-#include "gromacs/utility/futil.h"
-#include "gromacs/utility/smalloc.h"
-
-// #endif  GMX_VERSION >=50000
-
+#if GMX_VERSION < 50000
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 #include <ctype.h>
-#ifdef TIME_PROFILE
-#include <sys/time.h>
-#endif
 
-//#include "sysstuff.h"
 #include "string.h"
-//#include "string2.h"
-#include "typedefs.h"
 #include "smalloc.h"
-#include "macros.h"
 #include "gstat.h"
 #include "vec.h"
 #include "xvgr.h"
 #include "pbc.h"
 #include "copyrite.h"
 #include "futil.h"
-//#include "statutil.h"
-//#include "index.h"
 #include "tpxio.h"
-//#include "physics.h"
 #include "gmx_ana.h"
+#include <nbsearch.h>
+#ifdef UNIX  
+// used for handling signals
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/signal.h>
+#endif //UNIX
+
+#define gmx_ffopen ffopen
+#define gmx_ffclose ffclose
+#define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c),(d))
+#define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(d),(e),(f))
+
+#else
+
+#define wrap_gmx_rmpbc_init(a,b,c,d) gmx_rmpbc_init((a),(b),(c))
+#define wrap_read_next_x(a,b,c,d,e,f) read_next_x((a),(b),(c),(e),(f))
+//#include "gmxpre.h"
+#include "gromacs/commandline/cmdlinemodulemanager.h"
+#include "gromacs/commandline/cmdlinehelpcontext.h"
+
+#include <ctype.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 
+#include "commandline/pargs.h"
+#include "tpxio.h"
+#include "trxio.h"
+#include "xvgr.h"
+#include "gmx_ana.h"
+#include "gstat.h"
+#include "macros.h"
+#include "typedefs.h"
+#include "viewit.h"
+#include "vec.h"
+#include "pbc.h"
+#include "rmpbc.h"
+#include "index.h"
+#include "cstringutil.h"
+#include "file.h"
+#include "futil.h"
+#include "smalloc.h"
+
+
+#endif
+
+
+#ifdef VIRIAL_EXTENSION
+// this is defined in tpxio.h, in case...
+#warning  COMPILING THE CODE USING THE VIRIAL_EXTENSION
+#endif 
+
+
+#ifdef TIME_PROFILE
+#include <sys/time.h>
+#endif
+
+#define NORMAL_UNDEFINED -100
+#define LAYER_OFFSET 10000
+
+//////////////////////////////
+using namespace std;
 #include <stdio.h>
 #include <math.h>
 #ifdef ALPHA
@@ -3268,12 +3306,16 @@ int get_electrons(t_electron **eltab, const char *fn)
   return nr;
 }
 
-void remove_phase_pbc_old(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr){
+#ifndef MINIMIZER2
+void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, atom_id *index, int index_nr, int bInverse){
      /*we assume here that atoms have been already put into the box */
      /* compute the density at different control points: box edges, middle + some more */
+     // NOTE: here bInverse does not do anything.
      int rho[5],rho_max,i,nbins=25; 
      static real shift=0.0;
+     real initial_shift=shift;
      real bWidth ,z ;
+     ITIM* itim = global_itim;
   // TODO: check: this does not work with a solid ... bin must bigger than average interparticle z distance...
      bWidth = box[axis][axis]/nbins;
      while (1){ 
@@ -3295,7 +3337,7 @@ void remove_phase_pbc_old(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int ax
 
          }
          for(rho_max=rho[0],i=1; i<5;i++) if (rho[i]>rho_max) rho_max=rho[i];
-         if(rho[0] > rho_max/4 || rho[4] > rho_max/4) { /* careful: not >= otherwise the algorithm doesn't work when rho=0 
+         if(rho[0] > rho_max/2 || rho[4] > rho_max/2) { /* careful: not >= otherwise the algorithm doesn't work when rho=0 
             					       in all sampled regions */
             	shift+=bWidth*rand()/RAND_MAX;
 		fprintf(stderr,"Trying to shift the box by %f nm\n",shift);
@@ -3303,7 +3345,7 @@ void remove_phase_pbc_old(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int ax
          } else return ;
     }
 }
-
+#else
 double
 minimize_com2 (const gsl_vector *v, void *params)
 {
@@ -3451,6 +3493,7 @@ void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, 
     }
 #endif
 }
+#endif
 
 void center_coords(t_atoms *atoms,matrix box,rvec x0[],int axis,atom_id *index, int index_nr, int bInverse)
 {
