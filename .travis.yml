@@ -1,8 +1,8 @@
 language: cpp
 
 branches:
-  except:
-    - ITIM_test
+  only:
+    - ITIM
 
 
 before_install:
