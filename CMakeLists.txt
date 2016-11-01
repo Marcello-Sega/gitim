@@ -98,6 +98,16 @@ MESSAGE(STATUS "GMX version: ${GMX_VERSION}    on    ${CMAKE_HOST_SYSTEM}   ")
 ADD_DEFINITIONS(-DGMX_VERSION=${GMX_VERSION})
 MESSAGE(STATUS "============================================================")
 
+
+IF(${GMX_VERSION} VERSION_GREATER 59000)
+MESSAGE(STATUS "============================================================")
+MESSAGE(STATUS "GMX version: ${GMX_VERSION} not suppprted.")
+MESSAGE(STATUS "============================================================")
+MESSAGE(STATUS "                                                            ")
+MESSAGE(FATAL_ERROR "supported versions only up to 5.x")
+ENDIF(${GMX_VERSION} VERSION_GREATER 59000)
+
+
 ### version 4.6.x
 
 IF(${GMX_VERSION} VERSION_LESS 50000) 
