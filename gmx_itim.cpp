@@ -2813,9 +2813,9 @@ This is too cluttered. Reorganize the code...
 			    	case 'm': value = itim->masses[gmx_index_phase[j][i]]; break;
 			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
 			    	case 'n': value = 1; break;
-			    	case 'x': value = SQR(fr->v[gmx_index_phase[j][i]][0]); break;
-			    	case 'y': value = SQR(fr->v[gmx_index_phase[j][i]][1]); break;
-			    	case 'z': value = SQR(fr->v[gmx_index_phase[j][i]][2]); break;
+			    	case 'x': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* SQR(fr->v[gmx_index_phase[j][i]][0]); break;
+			    	case 'y': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* SQR(fr->v[gmx_index_phase[j][i]][1]); break;
+			    	case 'z': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* SQR(fr->v[gmx_index_phase[j][i]][2]); break;
 			    	case 'X': value = fr->v[gmx_index_phase[j][i]][0]; break;
 			    	case 'Y': value = fr->v[gmx_index_phase[j][i]][1]; break;
 			    	case 'Z': value = fr->v[gmx_index_phase[j][i]][2]; break;
@@ -3245,7 +3245,7 @@ void calc_intrinsic_density(const char *fn, Flags myflags, atom_id **index, int 
 #ifdef VIRIAL_EXTENSION
 	flags = TRX_NEED_X  |  TRX_READ_V |  TRX_READ_F;
 #else
-	flags = TRX_NEED_X | TRX_READ_V;
+	flags = TRX_NEED_X | TRX_READ_V | TRX_READ_F;
 #endif
 
 	if (!read_first_frame(oenv, &status,  fn , &fr, flags)){
@@ -3384,7 +3384,7 @@ int main(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "X", "Y", "Z",NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
