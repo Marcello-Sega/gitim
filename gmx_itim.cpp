@@ -2809,6 +2809,7 @@ This is too cluttered. Reorganize the code...
                      		        order2[0]=order2[1]=order2[2]=order2[3]=0.0; } 
                      if(j<itim->ngmxphases){ /* to take in account the random phase */
                             real value;
+		            real vec[3],mod;
                             switch(dens_opt){
 			    	case 'm': value = itim->masses[gmx_index_phase[j][i]]; break;
 			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
@@ -2819,6 +2820,32 @@ This is too cluttered. Reorganize the code...
 			    	case 'X': value = fr->v[gmx_index_phase[j][i]][0]; break;
 			    	case 'Y': value = fr->v[gmx_index_phase[j][i]][1]; break;
 			    	case 'Z': value = fr->v[gmx_index_phase[j][i]][2]; break;
+			    	case 'H': if((i%3)==0) { value=0; break; } 
+					  mod=0;
+					  for(int c=0;c<3;c++){
+					     vec[c]=fr->v[gmx_index_phase[j][3*(i/3)+1]][c]+
+					            fr->v[gmx_index_phase[j][3*(i/3)+2]][c]-
+					            2*fr->v[gmx_index_phase[j][3*(i/3)]][c];
+					     mod+=vec[c]*vec[c];
+				   	  }
+				  	  mod=sqrt(mod);
+					  for(int c=0;c<3;c++) vec[c]/=mod;
+					  value = vec[2]*vec[2];
+					  break;
+
+
+				case 'O': if((i%3)!=0) {value=0; break;}
+					  mod=0;
+					  for(int c=0;c<3;c++){
+					     vec[c]=fr->v[gmx_index_phase[j][3*(i/3)+1]][c]+
+					            fr->v[gmx_index_phase[j][3*(i/3)+2]][c]-
+					            2*fr->v[gmx_index_phase[j][3*(i/3)]][c];
+					     mod+=vec[c]*vec[c];
+				   	  }
+				  	  mod=sqrt(mod);
+					  for(int c=0;c<3;c++) vec[c]/=mod;
+					  value = vec[2]*vec[2];
+					  break;
 			
 #ifdef VIRIAL_EXTENSION
 			    	case 't': 
@@ -3384,7 +3411,7 @@ int main(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "X", "Y", "Z",NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "X", "Y", "Z","Hcos","Ocos",NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
