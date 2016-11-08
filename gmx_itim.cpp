@@ -2709,6 +2709,7 @@ This is too cluttered. Reorganize the code...
     static int rp_n=-1;
     real tmpreal;
     rvec tmprvec;
+    static FILE * STAT=NULL;
 #ifdef TIME_PROFILE
     struct timeval tp;
     struct timeval tp2;
@@ -2729,6 +2730,7 @@ This is too cluttered. Reorganize the code...
 
     if(2*size<histo->minsize) histo->minsize=2*size;
     histo->iterations++;
+    if(STAT==NULL)if(NULL!=getenv("STAT")) STAT=fopen("anglestats.dat","a");
     for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
 
         if(j==itim->RANDOM_PHASE && !itim->bMCnormalization) continue;
@@ -2883,6 +2885,7 @@ This is too cluttered. Reorganize the code...
                                 	  cprod(vec,wec,Vec);
                                           unitv(Vec,Vec);
 					  value = 3*Vec[2]*Vec[2] - 1  ;
+					  if(STAT!=NULL)if(itim->mask[i]==1) fprintf(STAT,"%f\n",Vec[2]*(fr->x[gmx_index_phase[j][i]]>0?1:-1));
 					  break;
 
 
@@ -2908,6 +2911,7 @@ This is too cluttered. Reorganize the code...
 				  	  mod=sqrt(mod);
 					  for(int c=0;c<3;c++) vec[c]/=mod;
 					  value = 3*vec[2]*vec[2]-1;
+					  if(STAT!=NULL)if(itim->mask[i]==1) fprintf(STAT,"%f\n",vec[2]*(fr->x[gmx_index_phase[j][i]]>0?1:-1));
 					  break;
 				case 'K': if((i%3)!=0) {value=0; break;}
 					  mod=0;
@@ -3069,6 +3073,7 @@ This is too cluttered. Reorganize the code...
 	   free(backindex);
 	}
     }
+    if(STAT!=NULL)fclose(STAT);
 #ifdef TIME_PROFILE
     gettimeofday(&tp2, NULL);
     fprintf(stdout,"Time to make the histogram(s) for %d phases: millisec=%f\n",itim->nphases,1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
