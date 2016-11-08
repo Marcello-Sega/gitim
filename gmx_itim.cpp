@@ -2809,7 +2809,7 @@ This is too cluttered. Reorganize the code...
                      		        order2[0]=order2[1]=order2[2]=order2[3]=0.0; } 
                      if(j<itim->ngmxphases){ /* to take in account the random phase */
                             real value;
-		            real vec[3],mod;
+		            real vec[3],wec[3],Vec[3],tmpv,mod;
                             switch(dens_opt){
 			    	case 'm': value = itim->masses[gmx_index_phase[j][i]]; break;
 			    	case 'c': value = itim->charges[gmx_index_phase[j][i]]; break;
@@ -2823,29 +2823,102 @@ This is too cluttered. Reorganize the code...
 			    	case 'H': if((i%3)==0) { value=0; break; } 
 					  mod=0;
 					  for(int c=0;c<3;c++){
-					     vec[c]=fr->v[gmx_index_phase[j][3*(i/3)+1]][c]+
-					            fr->v[gmx_index_phase[j][3*(i/3)+2]][c]-
-					            2*fr->v[gmx_index_phase[j][3*(i/3)]][c];
+					     vec[c]=0.0;
+					     tmpv=fr->x[gmx_index_phase[j][3*(i/3)+1]][c]-
+					            fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				             while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				             while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					     vec[c]+=tmpv;
+
+					     tmpv=fr->x[gmx_index_phase[j][3*(i/3)+2]][c]-
+					            fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				             while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				             while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					     vec[c]+=tmpv;
+
 					     mod+=vec[c]*vec[c];
 				   	  }
 				  	  mod=sqrt(mod);
 					  for(int c=0;c<3;c++) vec[c]/=mod;
-					  value = vec[2]*vec[2];
+					  value = 3*vec[2]*vec[2] - 1  ;
 					  break;
+
+				case 'h': if((i%3)==0) { value=0; break; } 
+					  mod=0;
+					  for(int c=0;c<3;c++){
+					    Vec[c]=0.0;
+					    tmpv=fr->x[gmx_index_phase[j][3*(i/3)+1]][c]-
+					           fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				            while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				            while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					    vec[c]=tmpv;
+
+					    tmpv=fr->x[gmx_index_phase[j][3*(i/3)+2]][c]-
+					           fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				            while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				            while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					    wec[c]=tmpv;
+					  }
+                                	  cprod(vec,wec,Vec);
+                                          unitv(Vec,Vec);
+					  value = 3*Vec[2]*Vec[2] - 1  ;
+					  break;
+
+				case 'o': if((i%3)!=0) { value=0; break; } 
+					  mod=0;
+					  for(int c=0;c<3;c++){
+					    Vec[c]=0.0;
+					    tmpv=fr->x[gmx_index_phase[j][3*(i/3)+1]][c]-
+					           fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				            while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				            while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					    vec[c]=tmpv;
+
+					    tmpv=fr->x[gmx_index_phase[j][3*(i/3)+2]][c]-
+					           fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				            while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				            while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					    wec[c]=tmpv;
+					  }
+                                	  cprod(vec,wec,Vec);
+                                          unitv(Vec,Vec);
+					  value = 3*Vec[2]*Vec[2] - 1  ;
+					  break;
+
 
 
 				case 'O': if((i%3)!=0) {value=0; break;}
 					  mod=0;
 					  for(int c=0;c<3;c++){
-					     vec[c]=fr->v[gmx_index_phase[j][3*(i/3)+1]][c]+
-					            fr->v[gmx_index_phase[j][3*(i/3)+2]][c]-
-					            2*fr->v[gmx_index_phase[j][3*(i/3)]][c];
+					     vec[c]=0.0;
+					     tmpv=fr->x[gmx_index_phase[j][3*(i/3)+1]][c]-
+					            fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				             while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				             while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					     vec[c]+=tmpv;
+
+					     tmpv=fr->x[gmx_index_phase[j][3*(i/3)+2]][c]-
+					            fr->x[gmx_index_phase[j][3*(i/3)]][c];
+				             while(tmpv>itim->box[c]/2.) tmpv-=itim->box[c];
+				             while(tmpv<-itim->box[c]/2.) tmpv+=itim->box[c];
+ 					     vec[c]+=tmpv;
+
 					     mod+=vec[c]*vec[c];
 				   	  }
 				  	  mod=sqrt(mod);
 					  for(int c=0;c<3;c++) vec[c]/=mod;
-					  value = vec[2]*vec[2];
+					  value = 3*vec[2]*vec[2]-1;
 					  break;
+				case 'K': if((i%3)!=0) {value=0; break;}
+					  mod=0;
+					  for(int c=0;c<3;c++){
+					    mod+= 0.5*itim->masses[gmx_index_phase[j][i+0]] * SQR(fr->v[gmx_index_phase[j][i+0]][c]);
+					    mod+= 0.5*itim->masses[gmx_index_phase[j][i+1]] * SQR(fr->v[gmx_index_phase[j][i+1]][c]);
+					    mod+= 0.5*itim->masses[gmx_index_phase[j][i+2]] * SQR(fr->v[gmx_index_phase[j][i+2]][c]);
+				   	  }
+					  value = mod;
+					  break;
+
 			
 #ifdef VIRIAL_EXTENSION
 			    	case 't': 
@@ -3411,7 +3484,7 @@ int main(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "X", "Y", "Z","Hcos","Ocos",NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "X", "Y", "Z","Hcos","Ocos","hcos","ocos","Kinetic",NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
