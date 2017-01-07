@@ -2709,7 +2709,7 @@ This is too cluttered. Reorganize the code...
     static int rp_n=-1;
     real tmpreal;
     rvec tmprvec;
-    static FILE * STAT=NULL;
+    FILE * STAT=NULL;
 #ifdef TIME_PROFILE
     struct timeval tp;
     struct timeval tp2;
@@ -2730,7 +2730,7 @@ This is too cluttered. Reorganize the code...
 
     if(2*size<histo->minsize) histo->minsize=2*size;
     histo->iterations++;
-    if(STAT==NULL)if(NULL!=getenv("STAT")) STAT=fopen("anglestats.dat","a");
+    if(STAT==NULL) if(NULL!=getenv("STAT")) STAT=fopen(getenv("STAT"),"a");
     for(j=SUPPORT_PHASE ; j<itim->nphases;j++){
 
         if(j==itim->RANDOM_PHASE && !itim->bMCnormalization) continue;
@@ -2819,6 +2819,9 @@ This is too cluttered. Reorganize the code...
 			    	case 'x': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* SQR(fr->v[gmx_index_phase[j][i]][0]); break;
 			    	case 'y': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* SQR(fr->v[gmx_index_phase[j][i]][1]); break;
 			    	case 'z': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* SQR(fr->v[gmx_index_phase[j][i]][2]); break;
+			    	case 'j': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* (fr->v[gmx_index_phase[j][i]][0]*fr->v[gmx_index_phase[j][i]][1]); break;
+			    	case 'k': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* (fr->v[gmx_index_phase[j][i]][0]*fr->v[gmx_index_phase[j][i]][2]); break;
+			    	case 'l': value = 0.5 *itim->masses[gmx_index_phase[j][i]]* (fr->v[gmx_index_phase[j][i]][1]*fr->v[gmx_index_phase[j][i]][2]); break;
 			    	case 'X': value = fr->v[gmx_index_phase[j][i]][0]; break;
 			    	case 'Y': value = fr->v[gmx_index_phase[j][i]][1]; break;
 			    	case 'Z': value = fr->v[gmx_index_phase[j][i]][2]; break;
@@ -3489,7 +3492,7 @@ int main(int argc,char *argv[])
   output_env_t oenv;
   static real alpha=0.2;
   static const char *dens_opt[] = 
-    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "X", "Y", "Z","Hcos","Ocos","hcos","ocos","Kinetic",NULL };
+    { NULL, "mass", "number", "charge", "electron", "skip", "tension", "Energy", "U(total energy)",  "x", "y", "z", "j","k", "l", "X", "Y", "Z","Hcos","Ocos","hcos","ocos","Kinetic",NULL };
   static int  axis = 2;          /* normal to memb. default z  */
   static const char *axtitle="Z"; 
   static const char *geometry[]={NULL,"plane","sphere","cylinder", "generic", NULL}; 
