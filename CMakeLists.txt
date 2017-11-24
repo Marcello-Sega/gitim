@@ -98,18 +98,15 @@ MESSAGE(STATUS "GMX version: ${GMX_VERSION}    on    ${CMAKE_HOST_SYSTEM}   ")
 ADD_DEFINITIONS(-DGMX_VERSION=${GMX_VERSION})
 MESSAGE(STATUS "============================================================")
 
+### version 4.6.x
 
-IF(${GMX_VERSION} VERSION_GREATER 59000)
+IF(${GMX_VERSION} VERSION_GREATER 59000) 
 MESSAGE(STATUS "============================================================")
 MESSAGE(STATUS "GMX version: ${GMX_VERSION} not suppprted.")
 MESSAGE(STATUS "============================================================")
 MESSAGE(STATUS "                                                            ")
 MESSAGE(FATAL_ERROR "supported versions only up to 5.x")
-ENDIF(${GMX_VERSION} VERSION_GREATER 59000)
-
-
-### version 4.6.x
-
+ENDIF(${GMX_VERSION} VERSION_GREATER 59000) 
 IF(${GMX_VERSION} VERSION_LESS 50000) 
 	# we need to check only for these two headers, the others will be in the same directories
 	SET (HEADERLIST "gmx_statistics.h" "gmx_header_config.h" "version.h")
@@ -220,6 +217,8 @@ INCLUDE(CheckCXXSourceCompiles)
 IF(NOT ${GMX_VERSION} VERSION_LESS 50000) 
 unset(HAVE_NEW_GMX_CONTEXT_INTERFACE CACHE)
 unset(HAVE_OLD_GMX_CONTEXT_INTERFACE CACHE)
+
+set(CMAKE_REQUIRED_FLAGS  "-std=c++0x")
 CHECK_CXX_SOURCE_COMPILES(
 "
 #include \"gromacs/commandline/cmdlinemodulemanager.h\"
@@ -234,6 +233,7 @@ main()
 " HAVE_NEW_GMX_CONTEXT_INTERFACE)
 
 
+set(CMAKE_REQUIRED_FLAGS  "-std=c++0x")
 CHECK_CXX_SOURCE_COMPILES(
 "
 #include \"gromacs/commandline/cmdlinemodulemanager.h\"
@@ -279,11 +279,11 @@ MESSAGE(STATUS "")
 
 
 # Let's tell cmake to check parameters for the examples
-ADD_DEFINITIONS(-Wall  -pedantic  -Wno-unused -Wuninitialized )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -pedantic  -Wno-unused -Wuninitialized  -std=c++0x")
 IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
-ADD_DEFINITIONS( -O0 )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
-ADD_DEFINITIONS( -O3 -ffast-math )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math")
 ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 
