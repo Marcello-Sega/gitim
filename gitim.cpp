@@ -1392,91 +1392,6 @@ void dump_itim_grid(ITIM * itim){
 	kd_res_free( presults );
 }
 
-int check_itim_testlines(Direction face, int index, real *pos, real sigma, ITIM *itim,int reset_flag,int ** gmx_index_phase, t_topology * top, rvec * x0){
-	int * p;          
-	int ccc=0;
-	static int flag=0;
-	static int partn=0;
-	real res[3];
-	static int counter=0; // this counts touched mesh lines
-	struct kdres *presults;
-	if(reset_flag==1) { flag=0; return 0; }
-	if(reset_flag==2) { counter=0; partn=0; return 0; }
-	if(counter == itim->mesh.nelem)  return 0;	
-	itim->alpha_index  = (int *) realloc (itim->alpha_index,(itim->n[0])* sizeof (int)); 
-	itim->alphapoints  = (real *) realloc (itim->alphapoints,(itim->n[0])* sizeof (real)*3);
-	itim->gmx_alpha_id = (int *) realloc (itim->gmx_alpha_id,(itim->n[0])* sizeof (int));
-	partn++;
-	presults = kd_nearest_range( itim->mesh.tree, pos, sigma + itim->alpha); 
-        while( !kd_res_end( presults ) ) {
-          /* get the data and position of the current result item */
-          p =  (int*)kd_res_item(presults, res); /* they were init'd all to DIR_POSITIVE. Once we find a 
-	  					    touching gridline, we flip the value (see below). */
-	  ccc++;
-	  if (*p==face) {
-		if(flag==0) { 
-			flag=1; // if already done, don't add this particle anymore.
-		        itim->alpha_index[itim->nalphapoints] = index;
-			if(itim->alphapoints==NULL) exit(printf("Error reallocating alphapoints\n"));
-			if(itim->com_opt[SUPPORT_PHASE]==0) { 
-	                       itim->gmx_alpha_id[itim->nalphapoints] =  gmx_index_phase[SUPPORT_PHASE][index];
-		               itim->alphapoints[3*itim->nalphapoints+0] = itim->phase[SUPPORT_PHASE][3*index+0]; 
-		               itim->alphapoints[3*itim->nalphapoints+1] = itim->phase[SUPPORT_PHASE][3*index+1];
-		               itim->alphapoints[3*itim->nalphapoints+2] = itim->phase[SUPPORT_PHASE][3*index+2];
-			       itim->nalphapoints++;
-			} else { 
-				int ind,dir,k;
-				real com[3]={0.0, 0.0, 0.0},mass=0,tot_mass=0,tmpcom[3],firstatom[3];
-				/* in case the atoms belong to a molecule we tagged already, skip this point */
-                                for(ind=0;ind<itim->nalphapoints;ind++){ 
-					if(itim->gmx_alpha_id[ind] == index ){
-						ind = -1; break;
-					}
-				}
-
-				for(k=  0 ;  k < itim->com_opt[SUPPORT_PHASE] ; k++) { 
-                                    /* let's go through all atoms in the tagged molecule ...  */
-				    ind = itim->com_opt[SUPPORT_PHASE] * ( index / itim->com_opt[SUPPORT_PHASE] ) + k;
-			            /* adding them to our list ...  */		
-				    itim->gmx_alpha_id[itim->com_opt[SUPPORT_PHASE]*itim->nalphapoints+k] =  gmx_index_phase[SUPPORT_PHASE][ ind ]; 
-				    mass = itim->masses[gmx_index_phase[SUPPORT_PHASE][ind]];
-				    tot_mass += mass;
-                                    /* ...and computing the com. */
-				    for(dir=0; dir<3; dir++){
-					tmpcom[dir] = x0[itim->gmx_alpha_id[ itim->com_opt[SUPPORT_PHASE] * 
-                                                      itim->nalphapoints + k ]][dir] ;
-                                        if(k==0){
-					   firstatom[dir] = tmpcom[dir];
-				        } else { 
-					   while(tmpcom[dir] -firstatom[dir] >  itim->box[dir]/2.){ tmpcom[dir] -= itim->box[dir];} 
-					   while(tmpcom[dir] -firstatom[dir] < -itim->box[dir]/2.){ tmpcom[dir] += itim->box[dir];}
-                                        }
-					com[dir] += tmpcom[dir] * mass;
-                                    }
-				}
-				
-				for(dir=0;dir <3; dir++){
-				        com[dir]/=tot_mass;
-					while(com[dir] >  itim->box[dir]/2.) com[dir] -= itim->box[dir];
-					while(com[dir] < -itim->box[dir]/2.) com[dir] += itim->box[dir];
-				        itim->alphapoints[3*itim->nalphapoints+dir]=com[dir];
-				}
-			        itim->nalphapoints++;
-			}
-
-		}
-		*p=-1*face;  // flip  the flag of the testline.
-		counter ++;
-		if(counter == itim->mesh.nelem) {counter = 0 ;  return 0 ;}
-	  }
-          /* go to the next entry */
-          kd_res_next( presults );
-        }
-	kd_res_free( presults );
-	return 1;
-}
-
-
 void check_kdtree ( struct kdtree * Surface, real * point , real range, real ** result_points , int * rp_n, int * n_elements ) { // TODO: change the name of this function !!
 
 	struct kdres *presults;
@@ -1539,43 +1454,6 @@ int check_kdtree_periodic (struct kdtree * Surface, real * box, real * pos , rea
 	return n_elements;
 } 
 
-int check_itim_testlines_periodic(Direction face, int index, real * pos,real sigma, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0){
-	int ret=1;
-	real periodic[2];
-	real border_positive[2];
-	real border_negative[2];
-	border_positive[0]=itim->box[0]/2. - sigma - itim->alpha ;
-	border_positive[1]=itim->box[1]/2. - sigma - itim->alpha ;
-	border_negative[0]=-itim->box[0]/2. + sigma + itim->alpha ;
-	border_negative[1]=-itim->box[1]/2. + sigma + itim->alpha ;
-
-	ret *= check_itim_testlines(face,index, pos,sigma,itim,0,gmx_index_phase,top, x0);
-	if(pos[0] < border_negative[0] || pos[0] > border_positive[0] ){
-		if(pos[0]< border_negative[0]){
-			periodic[0]=pos[0]+itim->box[0];
-		} else { 
-			periodic[0]=pos[0]-itim->box[0];
-		}
-		periodic[1]=pos[1];
-		ret *= check_itim_testlines(face,index,periodic,sigma,itim,0,gmx_index_phase,top,x0);
-	}
-	if(pos[1] < border_negative[1] || pos[1] > border_positive[1] ) { 
-		if(pos[1]< border_negative[1]){
-			periodic[1]=pos[1]+itim->box[1];
-		} else { 
-			periodic[1]=pos[1]-itim->box[1];
-		}
-		periodic[0]=pos[0];
-		ret *= check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
-		if(pos[0]< border_negative[0])
-			periodic[0]=pos[0]+itim->box[0];
-		if(pos[0]> border_positive[0])
-			periodic[0]=pos[0]-itim->box[0];
-		ret *= check_itim_testlines(face,index, periodic,sigma,itim,0,gmx_index_phase,top,x0);
-        }
-	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); // this just resets the flag within check_itim_testlines.
-	return ret;
-}
 int projection(const void * a, const void * b) {
 	real a2,b2; //NOTE this is weighted
 	int i,j;
@@ -1587,41 +1465,6 @@ int projection(const void * a, const void * b) {
 	return (a2>b2?-1:1);
 }
 
-// TODO !! NOTE: this allows only computation of surface molecules of the SUPPORT_PHASE
-void compute_itim_points(Direction direction, ITIM *itim, int ** gmx_index_phase,t_topology * top, rvec * x0){
-	int i=0,index,result;
-#ifdef TIME_PROFILE
-        struct timeval tp;
-        struct timeval tp2;
-        gettimeofday(&tp, NULL);
-#endif
-	qsort((void*)itim->phase_index[SUPPORT_PHASE], itim->n[SUPPORT_PHASE], sizeof(int) , projection);
-#ifdef TIME_PROFILE
-        gettimeofday(&tp2, NULL);
-        fprintf(stderr,"Time to quicksort for itim: millisec=%f\n",1000*(tp2.tv_sec-tp.tv_sec)+((double)tp2.tv_usec-(double)tp.tv_usec)/1000.);
-#endif
-        /* The positive side */
-        i=0;
-	do { 
-		index = itim->phase_index[SUPPORT_PHASE][i];
-		result = check_itim_testlines_periodic(DIR_POSITIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
-          	i++ ; 
-		if(i>=itim->n[SUPPORT_PHASE]) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the positive side...\n",itim->n[SUPPORT_PHASE])); }
-	} while (result) ;
-	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
-	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
-        /* The negative side */
-        i = itim->n[SUPPORT_PHASE]-1;
-	do { 
-		index = itim->phase_index[SUPPORT_PHASE][i];
-		result = check_itim_testlines_periodic(DIR_NEGATIVE,index,&itim->phase[SUPPORT_PHASE][3*index],itim->radii[index],itim,gmx_index_phase,top,x0) ; 
-          	i--; 
-		if(i<0) {exit(printf("Error: all (%d) particles scanned, but did not associate all testlines on the negative side...\n",itim->n[SUPPORT_PHASE])); }
-	} while (result) ;
-	check_itim_testlines((Direction)0,0, NULL,0,NULL,1,NULL,NULL,NULL); 
-	check_itim_testlines((Direction)0,0, NULL,0,NULL,2,NULL,NULL,NULL); 
-
-}
 
 #ifdef ALPHA
 real determinant3d(realT ** rows) {
@@ -2471,6 +2314,7 @@ void dump_surface_points(t_topology* top,FILE* cid){
         ITIM * itim=global_itim; 
         fprintf(cid,"%s\n",*(top->name));
         fprintf(cid,"%d\n",itim->nalphapoints);
+        printf("dumping surface, %d points",itim->nalphapoints);
  	for(i=0;i<itim->nalphapoints;i++){
                atom_index = itim->gmx_alpha_id[i];
                fprintf(cid,"%5i%5s%5s%5i%8.3f%8.3f%8.3f%8.4f%8.4f%8.4f\n",
@@ -2965,15 +2809,6 @@ void  compute_intrinsic_surface(matrix box, int ngrps, rvec * gmx_coords, int *n
         gettimeofday(&tp, NULL);
 #endif
 	switch (itim->method) { 
-		case METHOD_ITIM: 
-	              /* creates a grid which is as close as possible to the target mesh size, 
-	                 but still has an integer number of cells in the sim box*/
-	              init_itim_grid(itim);
-		      /* rearrange positions and indices to be fed to itim routines */
-	              arrange_datapoints(itim, gmx_coords, nindex,  (int**)gmx_index_phase);
-		      compute_itim_points(DIR_POSITIVE,itim,(int**)gmx_index_phase,top,gmx_coords);
-		      kd_free(itim->mesh.tree); itim->mesh.tree=NULL;
-		break;
 #ifdef ALPHA
 		case METHOD_A_SHAPE:
 	              arrange_datapoints(itim, gmx_coords, nindex,  (int**)gmx_index_phase);
@@ -3346,6 +3181,8 @@ void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, 
     }
 }
 #else
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_multimin.h>
 double
 minimize_com2 (const gsl_vector *v, void *params)
 {
@@ -3385,7 +3222,6 @@ minimize_com2 (const gsl_vector *v, void *params)
 		 r2+=ix*ix+iy*iy+iz*iz;
 	 }
   }
-  printf("r2=%f\n",r2);
   return r2;  
 }
 
@@ -3402,7 +3238,7 @@ void remove_phase_pbc(int ePBC,t_atoms *atoms, matrix box, rvec x0[], int axis, 
      int sign = 1-2*bInverse;
   // TODO: check: this does not work with a solid ... bin must bigger than average interparticle z distance...
      bWidth = box[axis][axis]/nbins;
-     const gsl_multimin_fminimizer_type *T =  gsl_multimin_fminimizer_nmsimplex2;
+     const gsl_multimin_fminimizer_type *T =  gsl_multimin_fminimizer_nmsimplex;
      gsl_multimin_fminimizer *s = NULL;
      gsl_vector *ss, *v;
      gsl_multimin_function minex_func;
