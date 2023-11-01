@@ -1,11 +1,17 @@
-## Status [![Build Status](https://travis-ci.org/Marcello-Sega/gitim.svg?branch=ITIM)](https://travis-ci.org/Marcello-Sega/gitim) 
+
+# [Pytim is out!](https://github.com/Marcello-Sega/pytim)
+
+**While gitim can still be used, it is not actively maintained anymore, and has mainly been superseded by [Pytim](https://github.com/Marcello-Sega/pytim)**
+
+In the overwhelming majority of cases it will be beneficial to use Pytim, as it is largely independent on the simulation code used, is actively maintained and includes a wider array of algorithms. If for any reason you still need to use this old implementation of the gitim algorithm, feel free to do so, but it is unlikely that support will be provided.
+
 
 ## Quick links
 *  [References](#references)
 *  [How to compile](#how-to-compile)
 *  [Tutorial](http://marcello-sega.github.io/gitim/tutorial.html)
 
-# What is ITIM/GITIM?  
+## What is ITIM/GITIM?  
 <img src="https://raw.githubusercontent.com/Marcello-Sega/gitim/ITIM/media/soot1small.png" width="180" align="right" style="z-index:999;">
 **ITIM** and **GITIM** are two algorithms for the identification
 of interfacial molecules or atoms. GITIM is a generalization of the
